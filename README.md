@@ -12,12 +12,14 @@ defense drill.
 
 ```
 atelier/
-├── apps/course-hub/   ← el hub (Next.js 15 → Vercel): mapa, evals, drills, progreso
+├── apps/course-hub/        ← el hub (Next.js 15 → Vercel): mapa, evals, drills, progreso
+│   └── content/chapters/M*/ ← leccion / practica / criterios-defensa / pruebas (drills)
 └── docs/
-    ├── DESIGN.md       ← diseño del curso (v3)
-    ├── research/       ← roadmaps, cursos, validaciones
-    └── chapters/M*/    ← leccion / practica / criterios-defensa / pruebas (drills)
+    ├── DESIGN.md            ← diseño del curso (v3)
+    └── research/            ← roadmaps, cursos, validaciones
 ```
+
+Live: **https://atelier-hub-smoky.vercel.app**
 
 El producto (Grounded) vive en un **repo aparte** y se *sigue* desde acá vía un contrato
 (`course.json`): el hub muestra build/tests/deploy/evals por módulo y deep-linkea al código.

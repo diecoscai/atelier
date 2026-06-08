@@ -3,10 +3,10 @@ import path from 'node:path';
 import matter from 'gray-matter';
 import type { ModuleContent, ModuleParsedDoc } from './types';
 
-// Course content lives in the Atelier repo at docs/chapters/<slug>/.
-// These reads happen at BUILD time (static server components), so no runtime
-// filesystem access is needed on Vercel — the build clones the whole repo.
-const CHAPTERS_DIR = path.join(process.cwd(), '..', '..', 'docs', 'chapters');
+// Course content is co-located with the hub at content/chapters/<slug>/ so a
+// standalone deploy of this app includes it. Reads happen at BUILD time (static
+// server components), so no runtime filesystem access is needed on Vercel.
+const CHAPTERS_DIR = path.join(process.cwd(), 'content', 'chapters');
 
 const FILE_MAP = {
   leccion: 'leccion.md',

@@ -1,26 +1,39 @@
-import type { GateStatus, ModuleProgress, ProgressMap } from './types';
+import type Redis from "ioredis";
+import type { GateStatus, ModuleProgress, ProgressMap } from "./types";
 
 // Single boundary to the mutable learner state (gates, drill verdicts).
-// Uses Vercel KV when configured; falls back to an in-memory store for local
-// dev so the hub runs without a KV instance. Called ONLY from API routes.
-const KV_READY = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-const KEY = 'atelier:progress';
+// Uses a standard Redis (Railway) via REDIS_URL when configured; falls back to
+// an in-memory store for local dev so the hub runs without Redis. Called ONLY
+// from API routes.
+const REDIS_URL = process.env.REDIS_URL;
+const KEY = "atelier:progress";
 
 const memStore: { value: ProgressMap } = { value: {} };
 
+// Singleton connection, reused across warm serverless invocations.
+let client: Redis | null = null;
+async function getClient(): Promise<Redis | null> {
+  if (!REDIS_URL) return null;
+  if (client) return client;
+  const { default: IORedis } = await import("ioredis");
+  client = new IORedis(REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: false });
+  return client;
+}
+
 async function readAll(): Promise<ProgressMap> {
-  if (!KV_READY) return memStore.value;
-  const { kv } = await import('@vercel/kv');
-  return (await kv.get<ProgressMap>(KEY)) ?? {};
+  const c = await getClient();
+  if (!c) return memStore.value;
+  const raw = await c.get(KEY);
+  return raw ? (JSON.parse(raw) as ProgressMap) : {};
 }
 
 async function writeAll(map: ProgressMap): Promise<void> {
-  if (!KV_READY) {
+  const c = await getClient();
+  if (!c) {
     memStore.value = map;
     return;
   }
-  const { kv } = await import('@vercel/kv');
-  await kv.set(KEY, map);
+  await c.set(KEY, JSON.stringify(map));
 }
 
 export async function getProgress(): Promise<ProgressMap> {
@@ -29,7 +42,7 @@ export async function getProgress(): Promise<ProgressMap> {
 
 export async function setGate(moduleId: string, gate: GateStatus): Promise<ModuleProgress> {
   const map = await readAll();
-  const prev = map[moduleId] ?? { gate: 'pending' as GateStatus };
+  const prev = map[moduleId] ?? { gate: "pending" as GateStatus };
   const next: ModuleProgress = { ...prev, gate, updatedAt: new Date().toISOString() };
   map[moduleId] = next;
   await writeAll(map);
@@ -42,7 +55,7 @@ export async function saveDrillVerdict(
   note?: string,
 ): Promise<ModuleProgress> {
   const map = await readAll();
-  const prev = map[moduleId] ?? { gate: 'pending' as GateStatus };
+  const prev = map[moduleId] ?? { gate: "pending" as GateStatus };
   const verdicts = [...(prev.drillVerdicts ?? []), { at: new Date().toISOString(), verdict, note }];
   const next: ModuleProgress = { ...prev, drillVerdicts: verdicts, updatedAt: new Date().toISOString() };
   map[moduleId] = next;
@@ -50,4 +63,4 @@ export async function saveDrillVerdict(
   return next;
 }
 
-export const kvReady = KV_READY;
+export const redisReady = Boolean(REDIS_URL);

@@ -10,6 +10,7 @@ const CHAPTERS_DIR = path.join(process.cwd(), 'content', 'chapters');
 
 const FILE_MAP = {
   leccion: 'leccion.md',
+  materialApoyo: 'material-apoyo.md',
   practica: 'practica.md',
   criteriosDefensa: 'criterios-defensa.md',
   pruebas: 'pruebas.md',

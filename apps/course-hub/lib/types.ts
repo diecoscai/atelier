@@ -46,6 +46,7 @@ export interface ModuleParsedDoc {
 
 export interface ModuleContent {
   leccion?: ModuleParsedDoc;
+  materialApoyo?: ModuleParsedDoc;
   practica?: ModuleParsedDoc;
   criteriosDefensa?: ModuleParsedDoc;
   pruebas?: ModuleParsedDoc;

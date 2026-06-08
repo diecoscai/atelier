@@ -48,6 +48,11 @@ export default async function ModulePage({ params }: { params: Promise<{ slug: s
       <div className="grid gap-8 md:grid-cols-[1fr_280px] md:items-start">
         <div className="space-y-8 order-2 md:order-1">
           <Section title="Lección" doc={content.leccion} empty="Capítulo aún no escrito." />
+          <Section
+            title="Material de apoyo"
+            doc={content.materialApoyo}
+            empty="Recursos curados para estudiar: pendiente."
+          />
           <Section title="Práctica" doc={content.practica} empty="Feature a construir: pendiente." />
           <Section
             title="Criterios de defensa"

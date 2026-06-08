@@ -1,0 +1,81 @@
+---
+module: M5
+---
+
+# Criterios de defensa — M5
+
+Al terminar M5 tenés que poder, en el nivel honesto indicado. M5 es Extended y de seguridad: el
+listón en los temas core (injection, ACL, red-team) es *can-defend-in-system-design*, no solo
+*can-explain* — un entrevistador de seguridad de LLMs no se conforma con definiciones.
+
+## Modelo de amenazas (OWASP LLM Top 10)
+
+- **(can-explain)** Nombrar los riesgos de OWASP LLM que tu sistema toca por su **ID y nombre**:
+  **LLM01** (Prompt Injection), **LLM02** (Sensitive Information Disclosure), **LLM08** (Vector &
+  Embedding Weaknesses), **LLM09** (Misinformation), y **LLM06** (Excessive Agency, para M6).
+- **(can-explain)** Por qué **LLM01 es el #1** y no se cierra con un prompt mejor: el LLM no separa
+  instrucción de dato a nivel arquitectónico — todo es la misma secuencia de tokens.
+
+## Prompt injection (directa e indirecta)
+
+- **(can-defend-in-system-design)** Explicar **injection directa vs indirecta (doc poisoning)**: en la
+  indirecta el atacante esconde instrucciones en un doc ingestado, el retrieval las trae como dato
+  "confiable", y atacante ≠ víctima. Por qué la indirecta es la más peligrosa y la que casi nadie
+  defiende.
+- **(can-defend-in-system-design)** Las **defensas en capas** y cuál es estructural vs probabilística:
+  estructural = aislamiento en SQL (no en el prompt), citas verificadas en código, ningún acto
+  gatillable por el retrieval; probabilística = separación instrucción/dato y delimitadores en el
+  prompt, sanitización heurística. Y que **no hay defensa del 100%** — se mitiga y se *contiene* el
+  impacto con diseño.
+- **(can-build)** Implementar la separación instrucción/dato (system vs user, contexto delimitado y
+  etiquetado como no confiable) y la sanitización de ingesta.
+
+## ACL-aware retrieval (permisos dentro del tenant)
+
+- **(can-defend-in-system-design)** Por qué el aislamiento por tenant de M4 **no alcanza**
+  intra-tenant y cómo se diseña ACL por documento/rol: `allowed_groups` en el chunk, grupos del **JWT
+  verificado**, `AND allowed_groups && $3` en el `WHERE`, RLS de dos dimensiones como defensa en
+  profundidad.
+- **(can-defend-in-system-design)** Por qué **filtrar en la query y no post-filtrar**: el post-filtro
+  ya cargó contenido restringido (fuga + LLM02) y rompe recall en silencio. Mismo principio que el
+  tenant.
+- **(can-build)** El test que prueba que un usuario sin el grupo no recupera el doc restringido.
+- **(awareness)** Cuándo grupos planos dejan de alcanzar y traerías **ReBAC** (Zanzibar / OpenFGA /
+  SpiceDB) — y por qué construirlo en Grounded hoy es YAGNI.
+
+## PII redaction
+
+- **(can-build)** Detectar y redactar PII con Presidio (NER + regex + checksum) **en ingesta** (antes
+  de embeber/guardar) y como **red de salida**.
+- **(can-defend)** Por qué redactar **en ingesta por defecto** (minimización: la PII nunca toca el
+  vector store, logs ni la API del proveedor) y la salida solo como red; y la diferencia entre
+  **redaction / masking / tokenization** y cuándo cada una.
+- **(can-explain)** Que la detección de PII **se mide** (precision/recall contra un set etiquetado) y
+  depende del **idioma** (modelo de spaCy por lengua).
+
+## Citation injection y técnicas adversarias
+
+- **(can-defend)** Qué es **citation injection** (forzar citas falsas/inventadas, conecta con LLM09) y
+  cómo la **verificación de cita por substring de M4** la bloquea; más delimiter/role smuggling y
+  encoding/obfuscation como evasiones que necesitan red-team, no markers fijos.
+
+## ⊕ Red-team en CI (garak)
+
+- **(can-build)** Apuntar **garak** a tu endpoint REST (no al modelo crudo) y correr probes de
+  injection/jailbreak/encoding/leak, parsear el reporte y **fallar el build** sobre umbrales.
+- **(can-build)** Escribir **probes custom** específicas de Grounded: cross-tenant probing y citation
+  injection, con umbral 0 de éxito del ataque.
+- **(can-defend-in-system-design)** **garak vs promptfoo**: naturaleza (scanner de vulnerabilidades vs
+  framework de eval+red-team) y por qué usás **los dos** (barrido adversarial genérico + ataques
+  específicos de dominio).
+- **(can-defend-in-system-design)** Por qué los tests de seguridad **son evals adversariales** y corren
+  en el **mismo gate de CI** que los evals de M2 — una entrada conocida (ataque) con salida esperada
+  (que NO funcione). Separarlos dejaría la seguridad sin gate.
+
+---
+
+> **Alcance M5 vs lo que sigue:** M5 endurece el aislamiento de M4 a nivel defendible en system design
+> para un RAG single-shot. **LLM06 (Excessive Agency)** se vuelve crítico recién con los **agentes de
+> M6**: ahí la regla "el contenido del retrieval no puede gatillar una acción/tool" pasa de buena
+> práctica a requisito duro. Saber dónde termina lo que construiste en M5 (defensas de un RAG, no de
+> un agente) es parte de la defensa madura.

@@ -1,0 +1,12 @@
+{
+  "name": "atelier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Engineering course-lab: the atelier where Diego forges himself as an AI Engineer (course-hub + curriculum + portfolio).",
+  "scripts": {
+    "dev": "pnpm --filter course-hub dev",
+    "build": "pnpm --filter course-hub build",
+    "start": "pnpm --filter course-hub start",
+    "lint": "pnpm --filter course-hub lint"
+  }
+}

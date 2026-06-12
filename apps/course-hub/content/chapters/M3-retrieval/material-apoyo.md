@@ -40,6 +40,24 @@ exacta al 100%, doy **autor + título** para que lo busques (no inventes que el 
    hybrid/rerank/query-transforms valen la pena. ~40 min. **Leelo entendiendo que es lo que conecta
    M2 (harness) con M3 (técnicas).**
 
+6. **Anthropic Engineering — "Writing effective tools for AI agents"**
+   `anthropic.com/engineering/writing-tools-for-agents`
+   La fuente de los 5 principios de tool design de §9: high leverage, namespacing, human-readable
+   outputs, token efficiency, documentación clara. Leelo antes de publicar el MCP server. ~25 min.
+
+7. **Jason Liu (jxnl) — Context Engineering Series (ago-2025)**
+   `jxnl.co` — buscá "Context Engineering Series" (index 28-ago-2025); empezá con "Beyond Chunks:
+   Why Context Engineering is the Future of RAG" (27-ago-2025) y "Why Grep Beat Embeddings in our
+   SWE-bench Agent" (11-sep-2025).
+   El marco de context engineering aplicado a RAG: faceted search para agentes y el caso empírico
+   de grep vs embeddings en código. Son los dos conceptos nuevos de §8 (metadata-rich retrieval y
+   retrieval heterogéneo). ~45 min entre los dos.
+
+**Credencial gratuita del módulo:** Anthropic Academy ofrece "Introduction to MCP" y "MCP:
+Advanced Topics" con certificado al completar — `anthropic.skilljar.com`. Los certificados son de
+un frontier lab y son gratuitos. Al terminar M3 es el momento de hacerlos (cubren server en Python,
+transporte stdio/HTTP, registro en Claude Desktop — todo lo que acabás de construir).
+
 ## Referencia (tené a mano mientras construís)
 
 - **pgvector — README** — `github.com/pgvector/pgvector` — repasá operadores (`<=>`) e índices

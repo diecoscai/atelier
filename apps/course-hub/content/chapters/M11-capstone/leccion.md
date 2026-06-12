@@ -1,7 +1,7 @@
 ---
 module: M11
 title: Capstone — packaging + distribución
-concept: Convertir el portfolio en un rol de AI Engineer (señales que pesan + distribución + reframe de identidad)
+concept: Convertir el portfolio en un rol de AI Engineer (señales que pesan + distribución + reframe de identidad + ruta de certificación)
 duration: ~5-7h lectura + 1-2 findes de ejecución
 ---
 
@@ -19,6 +19,19 @@ Este es el capstone. No construís una feature nueva — el sistema **Grounded**
 agentes, MCP server, deploy a managed cloud. Lo que falta es la parte que casi nadie hace bien:
 **convertir ese trabajo en un rol.** Ese es el objetivo #1 del curso, y este módulo es donde se
 cobra.
+
+**El framing de mercado 2026 para lo que construiste:**
+
+El stack de Grounded — RAG + evals + agentes + observabilidad — es exactamente el stack que el
+mercado 2026 llama **Forward Deployed Engineer (FDE)**, un rol que creció +800% YoY y tiene comp
+de $300K–$600K+. Las empresas que contratan FDEs piden exactamente lo que M0–M7 enseña. El
+packaging de M11 no es "tengo un proyecto de portfolio" — es "construí el stack del rol de mayor
+crecimiento del mercado". Decilo así en el CV.
+
+Los keywords de ATS 2026 para este framing (además de los técnicos del sistema) son:
+**context engineering**, **agentic engineering**, **harness engineering**, **trace grading**.
+Son los términos con los que el mercado nombra lo que hacés — el curriculum ya los enseñó, M11 los
+pone en el frente.
 
 ---
 
@@ -102,6 +115,12 @@ Venís de TS, full-stack. El instinto es presentarte como "full-stack developer 
 en AI". **Eso te subvende y te mete en la pila equivocada.** El reframe es a "AI Engineer que
 construye sistemas LLM de producción".
 
+**Los números de mercado 2026 para anclar el reframe:** el AI Engineer promedio en US gana $206K
+(+$50K vs 2025). Las posiciones de agentic engineering — el perfil que más se alinea con lo que
+construiste — crecieron +280% YoY con ~90K listings en early 2026. El rol FDE (Forward Deployed
+Engineer), que pide exactamente tu stack, tiene comp de $300K–$600K+. No estás apuntando a un
+nicho marginal: estás apuntando al segmento de mayor crecimiento del mercado.
+
 Usá la definición de **swyx** ("The Rise of the AI Engineer"): el AI Engineer es quien construye
 *productos* sobre foundation models — vive en la capa entre el ML researcher y el product
 engineer, domina RAG, evals, retrieval, agentes, orquestación, y el shipping de sistemas LLM.
@@ -121,9 +140,11 @@ poder reclamar (y que efectivamente construiste):
 
 ```
 RAG · vector databases (pgvector, Qdrant) · embeddings · evals / LLM-as-judge ·
-hybrid search · reranking · multi-agent / agentic · LangGraph · FastAPI · Python ·
-multi-tenancy · prompt engineering · semantic caching · model routing · MCP ·
-observability (Langfuse) · CI/CD for ML · structured outputs · fine-tuning (QLoRA)
+hybrid search · reranking · multi-agent / agentic · agentic engineering · LangGraph ·
+context engineering · harness engineering · trace grading · FastAPI · Python ·
+multi-tenancy · semantic caching · model routing · MCP · prompt caching ·
+observability (Langfuse) · CI/CD for ML · structured outputs · fine-tuning (QLoRA) ·
+Forward Deployed Engineer · FDE
 ```
 
 Regla: **solo reclamás keywords que podés defender.** Si está en el CV, tiene que estar en
@@ -146,12 +167,21 @@ eso demuestra que entendés el mercado, no solo la tecnología. Ese análisis ya
 Estructura del positioning statement (una versión larga para el sitio, una de 1 línea para el
 pitch):
 
-> *"AI Engineer que construye sistemas RAG de producción con rigor de evaluación. Construí
-> Grounded — un RAG SaaS multi-tenant de soporte B2B con eval harness (error-analysis →
-> golden dataset → LLM-as-judge en CI), hybrid retrieval (recall@5 0.61→0.89), aislamiento de
-> tenants verificado, y agentes. A diferencia de los productos cerrados como My AskAI o Ragie,
-> mi diferenciador es la evaluación medible y la defensibilidad de cada decisión de
-> arquitectura."*
+> *"AI Engineer (context engineering + agentic engineering) que construye sistemas LLM de
+> producción con rigor de evaluación. Construí Grounded — un RAG SaaS multi-tenant de soporte B2B
+> con eval harness (error-analysis → golden dataset → LLM-as-judge + trace grading en CI),
+> hybrid retrieval (recall@5 0.61→0.89), aislamiento de tenants verificado, y agentes con
+> harness engineering. El stack completo del Forward Deployed Engineer: RAG + evals + agentes +
+> observabilidad. A diferencia de los productos cerrados como My AskAI o Ragie, mi diferenciador
+> es la evaluación medible y la defensibilidad de cada decisión de arquitectura."*
+
+**Nota de producto avanzado (stretch goal — "reports > Q&A"):** el sistema que construiste es
+un Q&A assistant. El próximo salto de valor, según Jason Liu, es convertirlo en una herramienta
+de decisión: en vez de responder preguntas, generar *reports* — síntesis accionables con datos de
+múltiples docs, comparaciones, recomendaciones. La diferencia entre "¿cuál es nuestra política de
+reembolso?" y "generame un resumen de los 20 tickets de soporte más costosos del mes con
+recomendaciones de mitigación" es un orden de magnitud de valor de negocio. Si querés un stretch
+goal de portfolio que se destaque en entrevistas de producto, apuntá ahí.
 
 ---
 
@@ -238,22 +268,76 @@ suficiente; lo que te hace memorable es poder defender *por qué* cada decisión
 
 ---
 
-## 6. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
+## 6. Ruta de certificación (validación formal del stack)
+
+El portfolio y los defense drills son la señal #1. Las certificaciones la complementan y activan
+el ATS de empresas que filtran por credenciales. Esta sección mapea qué podés obtener gratis
+durante el curso, y qué tiene ROI alto después.
+
+### Durante el curso — gratis, hacé SIEMPRE
+
+| Cuándo | Credencial | Qué valida | Cómo obtenerla |
+|---|---|---|---|
+| M3 (MCP server) | **Anthropic Academy — MCP** | MCP servers/clients en Python, protocolo, integración | `anthropic.skilljar.com` — gratis, certificado real de un frontier lab, LinkedIn-able |
+| M6 (agentes) | **Anthropic Academy — Claude Code + Subagents** | Claude Code, subagentes, agentic workflows | ídem, mismo portal |
+| M6 (agentes) | **HF Agents Course** | smolagents, LlamaIndex, LangGraph | `huggingface.co/learn/agents-course` — gratis, 2 certificados |
+
+**Por qué Anthropic Academy es la prioridad:** es la única credencial gratuita de un frontier
+lab con contenido técnico de engineering real (no AI fluency). En 2026, tener el certificado de
+MCP del mismo laboratorio que lo creó es señal directa de que estás en la frontera.
+
+**Nota sobre OpenAI:** a junio 2026, OpenAI no tiene certificación técnica de engineering.
+Sus certs (AI Foundations, ChatGPT for Teachers) validan AI fluency, no API/agents/evals.
+*"If you're a builder, the credentials don't yet exist."* — no las incluyas en el CV como técnicas.
+
+### Post-curso — de pago, Tier 1 (ROI alto)
+
+Después de terminar el curso y conseguir el primer rol, una cert de cloud consolida la credibilidad
+de producción. El combo recomendado (~$700 total, 3-4 meses de prep en paralelo con el trabajo):
+
+| Credencial | Costo | Qué valida | Por qué elegirla |
+|---|---|---|---|
+| **AWS ML Engineer Associate (MLA-C01)** | $150 | SageMaker, MLOps, CI/CD, producción | Credibilidad de producción; el más reconocido por hiring managers |
+| **AWS GenAI Developer Professional (AIP-C01)** | $150 (beta) | Bedrock, LLMs, GenAI apps en prod | Primera cert Professional específica de GenAI; señal nueva de mercado |
+| **GCP Professional ML Engineer (PMLE)** | $200 | Vertex AI, MLOps, GenAI, model eval | Prestigio alto; evals de GenAI en scope |
+| **Databricks GenAI Engineer Associate** | $200 | RAG, LLM chains, MLflow, Model Serving | RAG/LLM chains = core 2026; production-focused |
+
+No necesitás las cuatro. AWS MLA-C01 primero (mejor ROI y reconocimiento); después elegí una
+según el stack de la empresa donde estés.
+
+### Evitar (a junio 2026)
+
+- **Azure AI Engineer Associate (AI-102):** se retira el 30-jun-2026 — no la prepares.
+- **Oracle OCI AI Foundations:** se retira el 22-jun-2026 — ídem.
+- **Certificaciones OpenAI:** son de AI fluency, no técnicas. No las incluyas en el CV de engineer.
+
+> **Checkpoint:** ¿por qué las cloud certs complementan el portfolio en vez de reemplazarlo?
+> Las cloud certs validan delivery (MLOps/serving); no validan las competencias diferenciales del
+> rol — evals, context engineering, agentes, harness engineering. Esas se validan con el portfolio
+> + la entrevista. El orden correcto: primero el portfolio, después las certs para cubrir el ATS
+> de empresas que las filtran.
+
+---
+
+## 7. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
 
 Al cerrar M11, esto es lo que un entrevistador (o vos mismo, en la mock defense) tiene que poder
 sacarte sin que dudes. Si no lo podés responder con tus palabras, números y decisiones, el
 capstone no está cerrado:
 
-- **El positioning statement, de memoria, en 1 línea y en 30 segundos.** Quién sos, qué
-  construiste, cuál es tu diferenciador. (Sección 3.2)
-- **El reframe honesto:** por qué sos "AI Engineer" y no "full-stack que usó AI", sostenido con
-  evidencia (el demo, los evals, el aislamiento). Sin inflar. (Sección 3)
+- **El positioning statement, de memoria, en 1 línea y en 30 segundos** — con los keywords 2026
+  (context engineering, agentic engineering, harness engineering, trace grading, FDE). (Sección 3.2)
+- **El reframe honesto:** por qué sos "AI Engineer" (o FDE candidate) y no "full-stack que usó AI",
+  sostenido con evidencia (el demo, los evals, el aislamiento) y los números de mercado ($206K avg,
+  +280% agentic jobs, +800% FDE). Sin inflar. (Sección 3)
 - **Las señales rankeadas:** qué le mostrás a un recruiter en 90 segundos y por qué *ese* orden.
   (Sección 2)
 - **La estrategia de distribución:** a quién, por dónde, con qué cadencia — y por qué dirigido y
   no en masa. (Sección 4)
 - **Las 4 rondas:** cómo tu portfolio responde a cada una, y dónde está el gap (DSA es práctica
   aparte). (Sección 5)
+- **La ruta de certificación:** qué obtenés gratis durante el curso (Anthropic Academy MCP/Claude
+  Code, HF Agents) y cuál es el Tier 1 de pago post-curso (AWS MLA-C01 primero). (Sección 6)
 - **El deep-dive completo del sistema:** cualquier decisión de M0–M10 con su número, su
   alternativa, y cuándo la cambiarías. Esto es el examen integral — la **mock defense** de
   `pruebas.md` capa 2.

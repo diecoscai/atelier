@@ -118,6 +118,33 @@ no-regresión.)
 `search_docs` → responde con chunks recuperados por *tu* pipeline hybrid+rerank. (Ver `pruebas.md`
 capa 1: el test de que el server responde a un `tools/call`.)
 
+## Paso 6b — Revisión de tool design contra los 5 principios
+
+Antes de publicar el MCP server, revisá `search_docs` (y cualquier otra tool que hayas expuesto)
+contra los 5 principios de la lección §9:
+
+**Hacer:**
+1. **High leverage:** ¿la tool hace algo que el agente no puede hacer de otra forma? Si es solo un
+   wrapper de texto, eliminala o rediseñala.
+2. **Clear namespacing:** el nombre `search_docs` — ¿es lo suficientemente específico? Si el server
+   pudiera crecer (indexar múltiples fuentes), ¿habría que agregar un prefijo de dominio?
+   Documentá la decisión.
+3. **Human-readable outputs:** abrí el log de una llamada real desde Claude Desktop. ¿Podés leer el
+   output fácilmente? ¿El modelo lo está usando bien? Si los chunks son muy largos, considerá
+   truncar o devolver un extracto + un link al full chunk.
+4. **Token efficiency:** calculá cuántos tokens consumen tus resultados en un llamado típico
+   (`top_k=5`, longitud promedio de chunk). Si superan 5K tokens por llamada, ajustá la longitud o
+   añadí paginación (`page` param).
+5. **Documentación:** el docstring actual de `search_docs` — leelo como si fueras el modelo. ¿Está
+   claro cuándo llamarla vs no? ¿Describe el formato del output? Mejoralo hasta que pase esa
+   lectura.
+
+Documentá los cambios que hiciste (o por qué no cambiaste nada) en `DECISIONS.md` bajo
+`ADR-00X "MCP tool design review"`.
+
+**Verificar:** cada uno de los 5 puntos tiene una respuesta en tu ADR — ya sea la decisión tomada
+o la justificación de por qué el diseño actual ya los cumple.
+
 ## Paso 7 — Capa de defensa (el entregable real)
 **Hacer:**
 - `DECISIONS.md`:
@@ -139,5 +166,6 @@ marcás el gate.
 ✅ Hybrid (BM25+dense) con RRF (`k=60`) andando · ✅ cross-encoder rerank (Cohere) reordenando el
 top-60 → top-5 · ✅ query transforms medidas (mantenés solo las que suben recall) · ✅ **tabla de
 recall@5 mostrando hybrid+rerank > baseline naive**, con el harness de M2 · ✅ **MCP server
-standalone publicado y funcionando desde Claude Desktop** · ✅ ADRs de M3 escritos con números ·
-✅ defense drills respondidos · ✅ `course.json` publicado. → marcás el gate en el panel del módulo.
+standalone publicado y funcionando desde Claude Desktop** · ✅ **revisión de tool design contra los
+5 principios documentada en ADR** · ✅ ADRs de M3 escritos con números · ✅ defense drills
+respondidos · ✅ `course.json` publicado. → marcás el gate en el panel del módulo.

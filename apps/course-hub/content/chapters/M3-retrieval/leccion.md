@@ -10,13 +10,38 @@ duration: ~8-10h lectura + 1 finde de práctica
 > **Qué vas a saber al terminar esta lección:** explicar por qué el retrieval *solo-vector* de M0
 > falla en casos reales, cómo lo arregla **hybrid search (BM25 + dense) + reranking**, qué hace
 > exactamente **RRF** (con la fórmula), cuándo ayudan las **query transformations** (rewriting,
-> HyDE), y cómo **exponer tu RAG como un MCP server** que cualquiera consume desde Claude Desktop
-> o Cursor. Todo el módulo se valida con un número: **recall@5 de hybrid+rerank vs el baseline
-> naive de M0**, medido con el harness de M2.
+> HyDE), cómo **exponer tu RAG como un MCP server** aplicando los principios de tool design, y
+> qué es **context engineering** — la disciplina que engloba todo lo que este módulo hace. Todo el
+> módulo se valida con un número: **recall@5 de hybrid+rerank vs el baseline naive de M0**, medido
+> con el harness de M2.
 
 > **Pre-requisito mental:** este módulo solo tiene sentido porque en M2 construiste el harness y
 > el golden dataset. Sin eso, "mejoré el retrieval" es vibes. Con eso, es `recall@5: 0.61 → 0.89`.
 > Esa es la diferencia entre un wrapper y un AI Engineer.
+
+---
+
+## 0. Context engineering: el nombre que le falta a lo que estás haciendo
+
+Este módulo trata sobre llenar el contexto del modelo con la información correcta, en el formato
+correcto, en el momento correcto. Eso tiene un nombre que llegó al mainstream en mid-2025 y es el
+que vas a ver en job listings y en entrevistas: **context engineering**.
+
+La definición de Andrej Karpathy (tweet del 25-jun-2025, la que cristalizó el concepto):
+
+> *"Context engineering is the delicate art and science of filling the context window with the
+> right information in the right format at the right time."*
+
+La atribución completa: Tobi Lütke (Shopify) fue el primero en usar el término viralmente el
+19-jun-2025; Karpathy lo formalizó seis días después; Jason Liu desarrolló el marco aplicado a RAG
+desde ago-2025; Gartner lo hizo mainstream: *"context engineering is in, prompt engineering is
+out"*.
+
+Por qué importa nombrarlo: Anthropic lo llama el "job #1 of engineers building AI agents"; es el
+keyword que los ATS de 2026 escanean; y el contexto inflado es, según el blog de Anthropic
+Engineering, *"el silent killer of agent reliability"*. M3 es context engineering aplicado a
+retrieval: elegir qué chunks entran al contexto, en qué orden, y con qué metadata — no a mano,
+sino medido con el harness de M2.
 
 ---
 
@@ -372,7 +397,64 @@ otra vez— se *mide*, no se adivina.
 
 ---
 
-## 8. Sidebar: DSPy (awareness — optimizar prompts con datos, no a mano)
+## 8. Retrieval para agentes: metadata-rich retrieval y cuándo grep le gana a embeddings
+
+### Faceted search: respuestas con estructura para que el agente refine
+
+Cuando el consumidor de tu RAG no es un usuario final sino un **agente**, el contrato de retrieval
+cambia. Jason Liu (Context Engineering Series, ago-sep-2025, jxnl.co) lo describe así: los
+resultados de retrieval para agentes deben incluir **metadata agregada** — conteos, categorías,
+facetas — no solo chunks de texto. ¿Por qué? Porque el agente necesita poder *refinar* la consulta.
+
+Si el agente busca "documentación de autenticación" y el retriever devuelve cinco chunks sin
+contexto, el agente no sabe si hay 5 docs o 500, si cubren OAuth o solo API keys, si son recientes
+o deprecados. Devolver solo texto lo obliga a adivinar. Devolver **facets** — `total_found: 47,
+categories: {oauth: 12, api_keys: 23, saml: 12}, date_range: {oldest: 2023-01, newest: 2025-11}`
+— le permite emitir una segunda query más precisa (ej. "OAuth, últimos 12 meses").
+
+El patrón en la práctica: tu `search_docs` del MCP server devuelve no solo los chunks sino también
+un bloque de metadata de la búsqueda. El agente lo usa para decidir si profundiza o expande.
+
+```python
+@mcp.tool()
+def search_docs(query: str, top_k: int = 5) -> dict:
+    """Busca en la base de conocimiento. Devuelve chunks + metadata para refinamiento."""
+    results = hybrid_search_rerank(query, top_k=top_k)
+    facets = compute_facets(results)   # conteos por categoría, rango de fechas, total encontrado
+    return {
+        "chunks": [{"content": r.content, "source": r.doc_id, "score": r.score} for r in results],
+        "metadata": facets,            # la señal que el agente usa para refinar
+    }
+```
+
+### Cuándo grep le gana a embeddings (SWE-bench, sep-2025)
+
+La suposición implícita en muchos sistemas RAG es que los embeddings son el método de retrieval
+correcto por default. Jason Liu documentó un contra-ejemplo directo: en su análisis del agente
+SWE-bench (sep-2025, "Why Grep Beat Embeddings in our SWE-bench Agent", jxnl.co), grep superó a
+embeddings en retrieval sobre código fuente.
+
+Por qué: los embeddings capturan significado semántico, pero código tiene *estructura léxica exacta*
+— nombres de funciones, imports, signatures. `search_for_function("parse_jwt_claims")` con grep
+encuentra el resultado exacto; los embeddings de una función y su llamadora son parecidos pero no
+idénticos, y la consulta por nombre exacto no se beneficia del espacio semántico.
+
+La conclusión que hay que poder defender: **elegir el método de retrieval según las propiedades del
+dominio**, no por default:
+
+| Dominio | Por qué embeddings | Por qué grep/BM25 |
+|---|---|---|
+| Soporte/FAQ en lenguaje natural | sinónimos, paráfrasis, intención variada | — |
+| Código fuente | — | nombres exactos, imports, signatures |
+| Documentación técnica | intención del usuario varía | referencias exactas a funciones/IDs |
+| Tickets con IDs/códigos de error | — | el ID es el token discriminante |
+
+En M3 hacés hybrid precisamente para no tener que elegir uno solo — pero la heurística de Liu es
+munición de system design cuando alguien te pregunta "¿por qué no usás solo embeddings?".
+
+---
+
+## 8b. Sidebar: DSPy (awareness — optimizar prompts con datos, no a mano)
 
 Hasta acá todo lo que escribiste —los prompts de query rewriting, de HyDE, de generación— lo
 tuneaste **a mano**: probás un wording, mirás si mejora, ajustás. **DSPy** (Stanford) propone otra
@@ -426,6 +508,45 @@ es JSON-RPC sobre **stdio** (server local) o **HTTP/SSE** (server remoto).
   Esa separación es buen diseño además de buen marketing.
 - **Demo instantánea:** en una entrevista, "mirá, conecto mi RAG a Claude Desktop y le pregunto por
   la doc de mi producto" es mucho más fuerte que un screenshot.
+
+### Tool design: el paradigma nuevo y los 5 principios
+
+Antes de escribir el server, un frame conceptual del blog de Anthropic Engineering ("Writing
+effective tools for AI agents", 2025):
+
+> *"Tools represent a fundamentally new software paradigm as contracts between deterministic
+> systems and non-deterministic agents."*
+
+Una tool no es solo una función. Es un **contrato** que el LLM lee, interpreta, y decide cuándo
+invocar — en el contexto de una conversación, con información parcial, sin poder predecir
+exactamente qué queries va a recibir. Eso cambia cómo se diseña.
+
+Los 5 principios (Anthropic Engineering, 2025):
+
+1. **High leverage** — cada tool debe darle al agente una capacidad que no puede tener de otra
+   forma. No wrappear un endpoint que no aporta valor agentivo real; más tools ≠ mejor.
+
+2. **Clear namespacing** — nombres que describen exactamente qué hace la tool sin ambigüedad.
+   `search_docs` es mejor que `query` o `get`. En MCP, el nombre es parte del contrato que el
+   modelo lee — la imprecisión ahí genera llamadas incorrectas.
+
+3. **Human-readable outputs** — los resultados deben ser legibles para el modelo (y para vos en
+   debug). Un JSON plano con `content` y `source` es mejor que un objeto anidado denso. Si el
+   modelo no puede leer el output, no puede usarlo.
+
+4. **Token efficiency** — los resultados de tools consumen tokens del contexto. Si tu `search_docs`
+   devuelve chunks completos de 1000 tokens cada uno, con k=10, gastás 10K tokens en el retrieval
+   solo. Paginá, truncá, o devolvé summaries cuando tenga sentido.
+
+5. **Documentación clara** — el docstring de tu tool **es** el prompt que el modelo lee para
+   decidir cuándo llamarla. No es un comentario de código. Es un contrato. Escribilo como si le
+   explicaras a un colega inteligente, en una oración, qué hace y cuándo usarla.
+
+**Proceso recomendado:** Prototype (construí rápido) → Evaluate (testea con el modelo real, no con
+tus suposiciones — el modelo va a llamar la tool de formas que no esperabas) → Collaborate (ajustá
+los nombres y docstrings en base a cómo el modelo la interpreta realmente).
+
+En la práctica de M3, vas a revisar tu `search_docs` contra estos 5 principios antes de publicarla.
 
 ### Forma mínima (Python, sin perderte en infra)
 El SDK oficial `mcp` (con `FastMCP`) hace que exponer una tool sea casi una función decorada:
@@ -490,6 +611,9 @@ una medición— es literalmente la diferencia de seniority que el curso entero 
 Al cerrar M3, un entrevistador podría preguntarte cualquiera de estas. Si no las podés responder
 con tus palabras *y con los números de tu harness*, el módulo no está cerrado:
 
+- "¿Qué es context engineering y por qué reemplazó a prompt engineering?" (§0: definición
+  Karpathy, atribución Lütke/Liu, framing Gartner; el foco pasó de qué le decís al modelo a qué
+  información le das y cómo la estructurás.)
 - "¿Por qué hybrid y no solo vector?" (§1-2: dense pierde en términos exactos; ejemplos de tu
   dominio.)
 - "¿Qué hace RRF, exactamente?" (§3: la fórmula `1/(k+rank)`, por qué rank y no score, qué hace
@@ -497,12 +621,16 @@ con tus palabras *y con los números de tu harness*, el módulo no está cerrado
 - "¿Por qué un cross-encoder es más preciso pero solo se usa para rerankear?" (§5: atención
   cruzada vs no-precomputable.)
 - "¿Cuándo NO usarías HyDE?" (§6: queries ya largas, out-of-domain donde alucina mal; lo medís.)
+- "¿Cuándo grep le gana a embeddings?" (§8: dominio con estructura léxica exacta — código,
+  nombres de función, IDs; caso SWE-bench de Liu, sep-2025.)
 - "¿Cohere rerank o self-hosted? ¿Por qué empezaste con uno?" (§5: YAGNI, validar señal antes de
   operar infra.)
 - "Mostrame el número: ¿cuánto subió recall@5 hybrid+rerank vs tu baseline naive?" (§1,5 + harness
   M2 — **este es el centro de tu defensa**.)
 - "¿Qué es MCP y por qué expusiste tu RAG así?" (§9: estándar, problema N×M, señal de mercado.)
-- "¿Qué es DSPy y cuándo lo usarías?" (§8: optimización programática de prompts; awareness.)
+- "Defendé los 5 principios de tool design en tu MCP server." (§9: high leverage, namespacing,
+  human-readable outputs, token efficiency, documentación clara — con decisiones reales de tu impl.)
+- "¿Qué es DSPy y cuándo lo usarías?" (§8b: optimización programática de prompts; awareness.)
 
 Seguí con `material-apoyo.md` para las fuentes canónicas, después `practica.md` para construir, y
 `pruebas.md` para el hard gate.

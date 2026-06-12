@@ -87,20 +87,68 @@ conocimiento desconectado — es la misma forma de pensar costo.
 
 ---
 
-## 4. Cómo correr el stream (sin que te coma el curso)
+## 4. Modo AI-assisted coding round (nuevo en 2026)
+
+Desde 2025-2026, algunas empresas permiten — o esperan — el uso de herramientas de AI en la
+ronda de coding:
+
+- **Canva (jun-2025):** espera explícitamente que los candidatos usen Copilot/Cursor/Claude Code
+  en la ronda técnica.
+- **Google (piloto Q2-2026):** está probando una ronda donde Gemini está disponible como
+  herramienta durante el coding round.
+
+Esto **no reemplaza** el modo clásico (solo vos + el enunciado). En la mayoría de loops sigue
+existiendo la ronda tradicional, y el modo AI-assisted evalúa habilidades distintas. Necesitás
+prepararte para los dos.
+
+### Qué evalúan en el modo AI-assisted
+
+No es "¿el agente resuelve el problema?". Evalúan si sabés **usar el agente con estrategia**:
+
+1. **Uso selectivo, no delegación total.** Usás el agente para subtareas bien definidas
+   (boilerplate, buscar un método, generar tests unitarios) — no para delegar el razonamiento.
+2. **Validación del output.** Ante cualquier sugerencia del agente, la verificás: ¿el algoritmo
+   es correcto? ¿el Big-O que propone es real? Un candidato que acepta el output sin validar
+   falla exactamente en lo que evalúan.
+3. **Debugging multi-step.** Si el agente genera código con un bug, sos vos quien lo detecta y
+   lo corrige — no el agente iterando a ciegas.
+4. **Control de la solución global.** La arquitectura de la solución (qué patrón, qué trade-off,
+   qué complejidad) la decidís vos. El agente ejecuta partes, vos orquestás y defendés.
+5. **Comunicación.** Igual que en el modo clásico: pensás en voz alta, aclarás por qué usás el
+   agente en *este* paso y no en otro.
+
+### Cómo practicar el modo AI-assisted
+
+Practicá N problemas del stream en este modo: resolvé el problema *con* Claude Code o Cursor
+abierto, pero seguí el guion de 5 pasos (§1) y usá el agente solo en pasos acotados. Después
+de resolverlo, **defendé cada decisión**: ¿por qué delegaste ese paso al agente? ¿Cómo
+verificaste que el output era correcto? ¿Qué hubieras hecho diferente sin el agente?
+
+Este modo de práctica es también el training del patrón Karpathy: *"Vibe coding raises the floor.
+Agentic engineering is about extrapolating the ceiling."* — el nivel sube cuando usás el agente
+con criterio, no cuando le cedés el control.
+
+---
+
+## 5. Cómo correr el stream (sin que te coma el curso)
 
 - **Cadencia baja y constante** gana a las maratones. Mejor 3-4 problemas por semana sostenidos
   que 30 en un fin de semana y nada por un mes.
+- **Dos modos de práctica:** clásico (sin AI, para el loop tradicional) y AI-assisted (con el
+  agente, para rondas tipo Canva/Google — ver §4). Alternará ambos para estar listo para los dos.
 - **No bloquea el checkpoint M4** ni ningún módulo. Es tracking aparte (ver `practica.md`).
 - **Curva:** primero *aprendé* el patrón (resolvé con ayuda/solución a la vista), después
   *practicá* (sin ayuda, con timer), al final *simulá* (mock con voz, como en `pruebas.md`).
 
 ---
 
-## 5. Lo que tenés que poder hacer (ver `criterios-defensa.md`)
+## 6. Lo que tenés que poder hacer (ver `criterios-defensa.md`)
 
-- Resolver un problema "easy/medium" de cada patrón en ~25-35 min, explicando en voz alta.
+- Resolver un problema "easy/medium" de cada patrón en ~25-35 min, explicando en voz alta
+  (modo clásico).
 - Dar el Big-O de tiempo y espacio de tu solución y decir si se puede mejorar.
 - Reconocer qué patrón aplica a un problema nuevo en los primeros 2-3 minutos.
+- En el modo AI-assisted (§4): usar el agente en subtareas acotadas, validar el output, defender
+  por qué delegaste cada paso y mantener el control de la solución global.
 
 Seguí con `material-apoyo.md` (NeetCode, Grind75, etc.) y armá tu plan en `practica.md`.

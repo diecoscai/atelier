@@ -32,30 +32,41 @@ gate: pending
 > No se avanza a M7 hasta responder esto **por escrito, con tus propias decisiones/números**.
 > Claude puede hacer de interviewer.
 
-1. **"Agent vs chain: ¿cuándo cada uno?"** — Defendé el espectro (LLM solo < chain/workflow <
+1. **"Nombrá los 5 patterns de Anthropic y decime cuándo usarías cada uno."** — Prompt Chaining ·
+   Routing · Parallelization (sectioning + voting) · Orchestrator-Workers · Evaluator-Optimizer.
+   Para cada uno: una oración de cuándo. No confundir los nombres es el piso mínimo.
+
+2. **"Agent vs chain: ¿cuándo cada uno?"** — Defendé el espectro (LLM solo < chain/workflow <
    agent) y el principio "empezá simple". Dame **un caso donde elegiste NO usar agente** en
    Grounded y por qué (el "no" cuenta más que el "sí").
 
-2. **"¿Cómo evaluás un agente, no solo una respuesta?"** — *(la más probable y la más castigada.)*
-   Explicá outcome eval (faithfulness/relevancy, M2) **+** trajectory eval (tool-correctness
-   determinístico + judge de "camino correcto"). Mostrá un caso donde el agente **acertó la
-   respuesta por el camino equivocado** y cómo lo agarrás. Si decís solo "mido faithfulness",
-   fallaste.
+3. **"¿Cómo evaluás un agente que llama 4 tools?"** — *(la más probable y la más castigada.)*
+   Trace grading sobre la secuencia completa de tool calls: outcome eval (faithfulness/relevancy,
+   M2) **+** trajectory eval (tool-correctness determinístico + path judge). Mostrá un caso donde
+   el agente **acertó la respuesta por el camino equivocado** y cómo lo agarrás. Si decís solo
+   "mido faithfulness", fallaste.
 
-3. **"¿Cómo adaptás RAG para un reasoning model (o3 / extended thinking / Gemini 2.5)?"** —
+4. **"¿Cuándo NO usarías un framework y trabajarías directo con la API?"** — Explicá el costo de
+   un framework (overhead, abstracción, lock-in) vs su beneficio (tipeado, checkpointing,
+   observabilidad). Cuándo el loop es lo suficientemente simple para no necesitarlo, y qué te da
+   LangGraph que un `while` loop no da.
+
+5. **"¿Cómo justificás el costo 15x de multi-agente?"** — El delta de calidad medido en tu eval,
+   qué lo justifica, y cómo el routing garantiza que el path caro solo se activa cuando es
+   necesario. Sin número medido, el 15x no está justificado.
+
+6. **"¿Por qué multi-agent acá? ¿Cuándo sería sobre-ingeniería?"** — El beneficio concreto de tus
+   2 agentes (evaluabilidad + enfoque). Por qué *no* más agentes.
+
+7. **"Explicame context engineering para agentes."** — Las 4 estrategias de Anthropic (offload
+   static, retrieve JIT, isolate per task, compress history) + las palancas de implementación
+   (selección, orden, compresión, budget). Por qué más contexto puede empeorar el resultado.
+
+8. **"¿Cómo adaptás RAG para un reasoning model (o3 / extended thinking / Gemini 2.5)?"** —
    System 1 vs System 2. Por qué inyectar chunks antes de que razone **cortocircuita** su mejor
-   capacidad. Tu adaptación: retrieval-as-tool, recuperar más grueso, rutear por modelo. Y por qué
-   hoy seguís en System 1 (costo/latencia).
+   capacidad. Tu adaptación: retrieval-as-tool, recuperar más grueso, rutear por modelo.
 
-4. **"¿Por qué multi-agent acá? ¿Cuándo sería sobre-ingeniería?"** — El beneficio concreto de tus
-   2 agentes (evaluabilidad + enfoque). Por qué *no* 5 agentes. El contrapunto de Cognition
-   ("Don't build multi-agents").
-
-5. **"Explicame context engineering."** — Las 5 palancas (selección, orden, compresión, budget,
-   aislamiento) con cómo cada una aparece en tu `build_context`. Por qué más contexto puede
-   empeorar el resultado.
-
-6. **"Mostrame tu grafo. ¿Cómo evitás un agente fuera de control?"** — Routing + `MAX_HOPS` +
+9. **"Mostrame tu grafo. ¿Cómo evitás un agente fuera de control?"** — Routing + `MAX_HOPS` +
    estado acotado. El failure mode (loop infinito / costo runaway) y tu red de seguridad.
 
 **Gate:** marcalo como pasado en el panel del módulo cuando (a) la capa 1 está verde en Grounded —

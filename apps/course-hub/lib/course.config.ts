@@ -24,6 +24,7 @@ export const MODULES: ModuleDef[] = [
   { id: 'SQ-A', slug: 'SQ-A-transformers', track: 'sidequest', title: 'Karpathy GPT lectures 7+8', tagline: 'Transformer literacy: implementar + doc "cómo funciona el modelo que llamás".' },
   { id: 'SQ-B', slug: 'SQ-B-makemore', track: 'sidequest', title: 'Makemore MLP + logprobs', tagline: 'Intuición de math + eval: instrumentar logprobs en el producto.' },
   { id: 'SQ-C', slug: 'SQ-C-banking77', track: 'sidequest', title: 'Clasificador Banking77', tagline: 'Classic ML: precision/recall/F1/confusion → routing barato antes del LLM (folded en M9).' },
+  { id: 'SQ-D', slug: 'SQ-D-agentic-coding', track: 'sidequest', title: 'Agentic coding — el ingeniero como orchestrator', tagline: 'CLAUDE.md, Plan Mode, verificación, subagentes, hooks. Delegation gap → engineer as orchestrator. Corre M0→M11.' },
 
   // ---- Stream paralelo (no es módulo del producto) ----
   { id: 'DSA', slug: 'DSA-stream', track: 'dsa', title: 'Stream de prep DSA', tagline: 'Coding-round patterns (arrays/hashing/two-pointers/graphs/DP). Corre desde M4 hasta entrevistas.' },

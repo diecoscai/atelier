@@ -19,9 +19,16 @@ clasificación es *can-defend-in-system-design*; en correr un QLoRA es *can-buil
   entrenar con SFTTrainer/TRL, guardar el adapter — sin copiar a ciegas un notebook.
 - **(can-build)** Leer una loss curve e identificar convergencia sana vs overfitting vs learning
   rate mal calibrado, y decir qué hiperparámetro tocar en cada caso.
-- **(can-defend)** **Cuándo fine-tune le gana a RAG y cuándo es un error**: RAG para conocimiento
-  que cambia, fine-tune para comportamiento (formato/estilo/dominio), y por qué en producción se
-  combinan. Con un caso concreto donde fine-tunear sería el error (meter hechos que cambian).
+- **(can-defend)** **El decision framework de fine-tuning**: el orden correcto es prompting →
+  RAG → fine-tuning; el 80% de los casos se resuelven antes de llegar al fine-tune; la regla de
+  oro es poder enunciar la métrica de eval que el prompting no puede mover *antes* de proponer
+  fine-tunear. Con un caso concreto donde fine-tunear sería el error (meter hechos que cambian).
+- **(can-defend)** **Cuándo fine-tune le gana a RAG**: RAG para conocimiento que cambia, fine-tune
+  para comportamiento (formato/estilo/dominio), patrón híbrido 2026 (RAG para hechos + FT para
+  estilo). Drill: ¿cuál es la métrica de eval que no se mueve con prompting y justifica el FT?
+- **(can-explain)** Los métodos de fine-tuning: SFT (comportamiento/formato), DPO (preferencias),
+  RFT (solo reasoning models); que GPT-5.x no es fine-tuneable; nombrar el método y el modelo
+  compatible al proponer fine-tuning.
 - **(can-explain)** Embedding fine-tuning de dominio: que el *retrieval* también se fine-tunea (con
   pares de tu dominio + contrastive loss) y cuándo es el siguiente paso después del reranking.
 - **(can-build)** Entrenar un clasificador de intents (Banking77) con sklearn y reportar

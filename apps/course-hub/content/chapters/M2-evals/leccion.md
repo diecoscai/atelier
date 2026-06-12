@@ -129,11 +129,26 @@ importan, y habrías diseñado un judge genérico que quizás no detecta *tu* ti
 > judge contra esa taxonomía: recall@5 para Y, un judge de faithfulness para X..."* Eso te pone
 > en otro nivel. Es el contenido de `criterios-defensa.md` de este módulo.
 
+### 2.4 Confirmación canónica: "error analysis > infraestructura" (ene-2026)
+
+Esta posición no es la de este curso solo: es la conclusión de la encuesta de **Hamel Husain y
+Shreya Shankar** de enero 2026, respondida por 700+ engineers de Google, Microsoft, OpenAI, Meta,
+Amazon y otros. Su FAQ ("LLM Evals: Everything You Need to Know", hamel.dev/blog/posts/evals-faq)
+afila la posición sin ambigüedades:
+
+> *"La mayoría sobreinvierte en infraestructura de evals antes de entender qué errores comete
+> el sistema. Error analysis es LA actividad más importante."*
+
+El curso arranca acá (sección 2) por exactamente esa razón: la taxonomía de fallas es el
+insumo que le da sentido a todo lo demás — métricas, judges, golden set. Sin ella, estás
+construyendo infraestructura para medir lo que no sabés que querés medir.
+
 > **Checkpoint:** ¿por qué error analysis va antes que elegir métricas?
 > Porque las métricas solo significan algo si miden TUS modos de falla reales. Elegirlas antes es
 > tomarlas de un menú genérico sin saber si atacan tus problemas. Leés traces a mano para
 > *descubrir* cómo falla tu sistema (taxonomía), y recién entonces elegís/diseñás métricas y
-> judges que ataquen esas fallas concretas.
+> judges que ataquen esas fallas concretas. Posición confirmada por 700+ engineers (Hamel/Shreya,
+> ene-2026).
 
 ---
 
@@ -232,7 +247,7 @@ ES la ground truth de retrieval, gratis.
 
 ```python
 # Generación sintética básica de un par Q&A anclado en un chunk real.
-# Modelo barato y separado del que genera respuestas en prod (sección 6.3).
+# Modelo barato y separado del que genera respuestas en prod (sección 6.6).
 SYNTH_PROMPT = """Sos un generador de datos de evaluación para un sistema de soporte.
 Dado el siguiente fragmento de documentación, generá UNA pregunta realista que un cliente
 haría y cuya respuesta esté COMPLETAMENTE contenida en el fragmento. Devolvé JSON:
@@ -325,7 +340,7 @@ def test_rag_faithfulness(case):
         retrieval_context=retrieve_chunks(case["question"]),   # los chunks recuperados
         expected_output=case["ground_truth_answer"],
     )
-    # Umbrales: el gate falla si bajan (sección 8). Judge barato y separado (sección 6.3).
+    # Umbrales: el gate falla si bajan (sección 8). Judge barato y separado (sección 6.6).
     assert_test(test_case, [
         FaithfulnessMetric(threshold=0.85, model="gpt-4o-mini"),
         ContextualRecallMetric(threshold=0.80, model="gpt-4o-mini"),
@@ -376,7 +391,7 @@ class Verdict(BaseModel):
 
 def judge_faithfulness(question: str, answer: str, context: str) -> Verdict:
     resp = client.messages.parse(
-        model="claude-haiku-4-5",       # barato y SEPARADO del modelo de generación (6.3)
+        model="claude-haiku-4-5",       # barato y SEPARADO del modelo de generación (6.6)
         max_tokens=1024,
         thinking={"type": "adaptive"},  # que razone el veredicto
         system=JUDGE_SYSTEM,
@@ -391,7 +406,93 @@ Fijate que el prompt del judge **codifica la taxonomía** (las reglas salen de l
 de la sección 2). Eso es alinear el judge a tus fallas — no un judge genérico de "¿está buena la
 respuesta?".
 
-### 6.2 Sus sesgos (tenés que conocerlos para defender el judge)
+### 6.2 Taxonomía: cuándo usás code-based vs LLM-based
+
+Antes de hablar de sesgos, la pregunta de diseño que va primero: **¿necesito un judge o alcanza
+con un check determinístico?** Hamel Husain y Shreya Shankar (FAQ ene-2026, 700+ engineers)
+distinguen dos tipos de evals y advierten contra mezclarlos sin criterio:
+
+- **Code-based (if/else / determinístico):** compara strings exactos, chequea si aparece una
+  cita, cuenta tokens, verifica formato JSON, mide recall@k con IDs de ground truth. Barato,
+  reproducible, sin varianza entre corridas. **Usalo siempre que puedas** — para retrieval
+  metrics (recall@k, MRR) y cualquier chequeo que tenga respuesta correcta o incorrecta unívoca.
+
+- **LLM-based (juicio):** el model evalúa semántica, coherencia, fidelidad al contexto, tono. Lo
+  usás cuando no hay ground truth exacta y el criterio requiere comprensión del lenguaje natural.
+  La taxonomía de RAGAS (faithfulness, answer relevancy) vive acá.
+
+**La regla de oro:** no mezclar hasta saber cuál usar. Mezclar significa correr un LLM-judge sobre
+algo que un `assert "no sé" in response` resolvería gratis — o peor, no correr nada porque "es
+difícil de medir" cuando había una métrica determinística disponible.
+
+> **En entrevista:** "¿cuándo usás code-based vs LLM-based?" La respuesta correcta: "Code-based
+> primero siempre que el criterio sea unívoco — es más barato y más reproducible. LLM-based solo
+> cuando el juicio requiere comprensión semántica que un if/else no puede capturar. Para mi
+> sistema: recall@k y hit-rate son code-based; faithfulness y answer-relevancy son LLM-based."
+
+### 6.3 El evaluation flywheel
+
+El harness no es un artefacto estático que construís en M2 y olvidás. Es un **loop de mejora**
+continuo. El patrón canónico (OpenAI cookbook, ago-2025):
+
+```
+medir con graders → identificar dónde fallan → mejorar prompts/componentes → volver a medir
+```
+
+Cada iteración es un ciclo completo: correr el harness contra el golden set, analizar qué casos
+fallaron y por qué (error analysis de vuelta), ajustar el sistema (prompt, chunking, reranker,
+umbral), medir de nuevo, y repetir hasta cruzar el umbral de calidad definido. El CI gate de la
+sección 8 **es** el punto de control del flywheel: cuando una métrica sube, el umbral también
+sube — never regress.
+
+Lo que distingue este loop del whack-a-mole de la sección 1: tenés un número que dice
+exactamente cuánto mejoró (o empeoró) cada cambio, contra el mismo conjunto fijo de casos.
+
+### 6.4 SME alignment: validar el judge contra experto humano (no confiar a ciegas)
+
+Los scores del LLM-judge son una opinión. Una opinion que hay que calibrar. OpenAI advierte
+explícitamente: **"LLM Graders must undergo SME alignment validation rather than blindly trusting
+scores."** (guías oficiales de evals, 2025).
+
+El proceso:
+1. Etiquetá vos mismo (o con un experto del dominio) 20-30 casos de tu golden set — por ejemplo:
+   `faithful`, `unfaithful`, `borderline`.
+2. Corré el LLM-judge sobre los mismos casos.
+3. Calculá el **% de acuerdo** y, mejor aún, el **Cohen's Kappa (κ)**.
+
+**Cohen's Kappa** corrige el acuerdo por azar: dos anotadores que votan al azar sobre categorías
+desbalanceadas van a coincidir un porcentaje de las veces por casualidad. Kappa (κ) lo descuenta.
+Interpretación práctica:
+
+| κ | Interpretación |
+|---|---|
+| < 0.20 | Acuerdo pobre — el judge no sirve, reescribí el criterio |
+| 0.20–0.40 | Leve — marginal, poco confiable |
+| 0.40–0.60 | Moderado — usable con cautela |
+| 0.61–0.80 | Substancial — confiable para producción |
+| > 0.80 | Casi perfecto — muy bueno |
+
+```python
+# Calcular Cohen's Kappa sobre las etiquetas del judge vs las tuyas
+from sklearn.metrics import cohen_kappa_score
+
+human_labels = [1, 0, 1, 1, 0, 0, 1, 0, 1, 1]   # tus etiquetas (1=faithful, 0=unfaithful)
+judge_labels = [1, 0, 1, 0, 0, 1, 1, 0, 1, 1]   # lo que el judge decidió
+
+kappa = cohen_kappa_score(human_labels, judge_labels)
+# kappa = 0.60 → moderado. Revisá los casos donde difieren antes de deployar.
+```
+
+Documentá el kappa en `judge_validation.md`. Si κ < 0.40, el judge no está alineado — revisá
+el prompt, los criterios, y posiblemente si el modelo barato que elegiste tiene el nivel de
+comprensión necesario para este dominio.
+
+> **Lo que defendés:** "Mi judge tiene κ=0.73 sobre 25 casos etiquetados a mano — acuerdo
+> substancial. Sé que discrepa en casos de paráfrasis indirecta, que son el 15% de las
+> discrepancias. Para esos casos el judge conservador falla más; lo compenso bajando un tick el
+> threshold de producción." Eso es SME alignment real, no "el judge dice 0.91 entonces es bueno".
+
+### 6.5 Sus sesgos (tenés que conocerlos para defender el judge)
 
 Un LLM-judge no es un oráculo. Tiene sesgos documentados; mencionarlos en entrevista muestra que
 no lo tratás como caja mágica:
@@ -408,13 +509,10 @@ no lo tratás como caja mágica:
 - **Sycophancy:** tiende a estar de acuerdo / ser condescendiente. *Mitigación:* prompt estricto,
   criterios binarios y verificables, pedir justificación.
 
-La mitigación maestra de todas: **validá el judge contra labels humanos.** Etiquetá vos mismo
-20-30 casos (faithful / no faithful), corré el judge sobre esos mismos casos, y medí qué tan de
-acuerdo está con vos (% de acuerdo). Un judge que coincide con vos el 90% es confiable; uno al
-60% no sirve y hay que reescribir el criterio. **Un judge sin validar es otra forma de
-vibes-based.**
+La mitigación maestra de todas: **validá el judge contra labels humanos con Cohen's Kappa.** Sin
+validación, el judge es otra forma de vibes-based. (Ver sección 6.4.)
 
-### 6.3 Por qué un modelo barato y separado
+### 6.6 Por qué un modelo barato y separado
 
 Dos reglas para el modelo del judge:
 
@@ -426,11 +524,12 @@ Dos reglas para el modelo del judge:
    self-preference bias contamina el resultado (se aprueba a sí mismo). Separar el judge es parte
    de hacer la evaluación honesta.
 
-> **Checkpoint:** nombrá dos sesgos del LLM-judge y cómo los mitigás.
-> *Position bias* (prefiere cierta posición en comparaciones) → corré ambos órdenes y promediá, o
-> usá scoring absoluto. *Verbosity bias* (premia respuestas largas) → instruí "no te dejes influir
-> por la longitud" y normalizá. Y la mitigación general: validar el judge contra labels humanos
-> midiendo % de acuerdo.
+> **Checkpoint:** nombrá dos sesgos del LLM-judge y cómo los mitigás. ¿Cuándo usás code-based en
+> vez de LLM-based?
+> *Position bias* → corré ambos órdenes y promediá. *Verbosity bias* → instruí "no te dejes
+> influir por la longitud". Mitigación general: validar con Cohen's Kappa contra labels humanos.
+> Code-based primero cuando el criterio es unívoco (recall@k, hit-rate, formato JSON); LLM-based
+> solo cuando se requiere juicio semántico.
 
 ---
 
@@ -531,7 +630,7 @@ con *tus* números y decisiones, el módulo no está cerrado:
 - "Nombrame métricas de RAGAS y qué mide cada una." (Sección 3 — faithfulness ≠ answer relevancy)
 - "¿Cómo funciona tu LLM-judge y qué sesgos tiene? ¿Cómo sabés que es confiable?" (Sección 6 —
   validación contra labels humanos)
-- "¿Por qué un modelo barato y separado para el judge?" (Sección 6.3)
+- "¿Por qué un modelo barato y separado para el judge?" (Sección 6.6)
 - "¿Cómo construiste el golden dataset y por qué acá y no en M1?" (Sección 4)
 - "¿Qué pasa en tu CI cuando un cambio baja una métrica?" (Sección 8 — regression gate)
 - "¿Cómo evaluarías un *agente* (no solo una respuesta) con este harness?" (Sección 9)

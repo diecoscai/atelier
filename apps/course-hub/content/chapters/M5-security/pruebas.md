@@ -45,6 +45,12 @@ gate: pending
           assert "gratis" not in resp.text.lower()   # no obedeció la instrucción inyectada
           assert "99" in resp.text                    # respondió el dato real
       ```
+- [ ] **Análisis de trifecta documentado (lethal trifecta check).** En `DECISIONS.md` existe un ADR
+      que responde: (1) ¿cuántas patas de la trifecta tiene el sistema Grounded con el MCP server
+      conectado? (2) ¿Cuál pata eliminaste o restringiste? (3) ¿Qué capacidades externas no le das al
+      agente? Este no es un test automatizado — es documentación de diseño que podés defender en voz
+      alta. (Si el sistema tiene las 3 patas completas y no hay un ADR explicando cómo se mitiga, el
+      gate no está cerrado.)
 - [ ] **★ PII redactada en ingesta.** Ingestás texto con email/teléfono → los chunks guardados tienen
       `<EMAIL_ADDRESS>`/`<PHONE_NUMBER>`, no los valores. La red de salida redacta PII que se cuele en
       una respuesta.
@@ -80,39 +86,64 @@ gate: pending
 > No se avanza a M6 hasta responder esto **por escrito, con tus propias defensas/decisiones**, y tener
 > la suite de red-team verde en CI. Claude puede hacer de interviewer de seguridad de LLMs.
 
-1. **"¿Cómo defendés contra prompt injection?"** — Esperan: directa vs indirecta; que **NO hay defensa
+1. **"¿Qué es la lethal trifecta y por qué importa?"** — Las 3 propiedades: (1) acceso a datos
+   privados, (2) exposición a contenido no confiable, (3) capacidad de comunicación externa. Que la
+   presencia simultánea hace exfiltrable al sistema. Que la defensa es eliminar una pata, no agregar
+   guardrails (Willison: *"ningún producto de guardrails previene el 95% de los ataques"*). Ataques
+   reales: Supabase MCP (jul-2025), Summer of Johann (ago-2025).
+
+2. **"¿Qué son los Agents Rule of Two?"** — Máximo 2 de las 3 propiedades riesgosas de la trifecta
+   en un agente. Si tiene las tres, hay que quitar una antes de deployar. Inspirado en el Chrome
+   Rule of 2 (Willison, nov-2025).
+
+3. **"¿Tu MCP server (M3) es un vector de ataque? ¿Cómo lo limitaste?"** — Analizá la trifecta del
+   sistema Grounded con el MCP server conectado. ¿Cuántas patas tiene? ¿Qué restricciones le pusiste
+   a las tools para limitar la comunicación externa? ¿Qué pata eliminaste? Mostrá el ADR de tu
+   análisis.
+
+4. **"¿Cómo defendés contra prompt injection?"** — Esperan: directa vs indirecta; que **NO hay defensa
    del 100%**; las **capas** (separación instrucción/dato, no darle autoridad al retrieval,
    sanitización), y cuál es **estructural** (aislamiento en SQL, citas verificadas en código, nada
    gatillable por el retrieval) vs **probabilística** (delimitadores y directivas en el prompt).
    *Decir "le pongo en el prompt que no obedezca instrucciones del doc" como única defensa = reprobás.*
-2. **"¿Qué es doc poisoning / prompt injection indirecta?"** — El atacante esconde instrucciones en un
+
+5. **"¿Qué es doc poisoning / prompt injection indirecta?"** — El atacante esconde instrucciones en un
    doc ingestado; cuando el retrieval lo trae, sus instrucciones entran al prompt como dato
    "confiable"; **atacante ≠ víctima** y el payload queda latente en el índice. Por qué es la más
    peligrosa.
-3. **"Aislás tenants (M4). ¿Y adentro del tenant, todos ven todo?"** — No: **ACL-aware retrieval**.
+
+6. **"Aislás tenants (M4). ¿Y adentro del tenant, todos ven todo?"** — No: **ACL-aware retrieval**.
    `allowed_groups` en el chunk, grupos del **JWT verificado**, `AND allowed_groups && $3` en el
    `WHERE`, RLS de dos dimensiones. Por qué **filtrar en la query y no post-filtrar** (fuga + recall
    roto).
-4. **"¿Cómo manejás PII?"** — **Redaction en ingesta** por defecto (minimización: nunca toca el vector
+
+7. **"¿Cómo manejás PII?"** — **Redaction en ingesta** por defecto (minimización: nunca toca el vector
    store/logs/API) + red de salida; **Presidio** (NER + regex + checksum); **redaction vs masking vs
    tokenization** y cuándo cada una; y que la detección **se mide** y depende del idioma.
-5. **"¿Qué es citation injection y cómo la frenás?"** — Forzar citas falsas/inventadas (conecta con
-   LLM09); la **verificación de cita por substring de M4** la bloquea; la suite adversarial lo prueba.
-6. **"Mostrame que tu seguridad funciona, no me la cuentes."** — No lo cuentes: corré la **suite de
+
+8. **"¿Qué es citation injection y cómo la frenás?"** — Forzar citas falsas/inventadas (conecta con
+   LLM09 Misinformation); la **verificación de cita por substring de M4** la bloquea; la suite
+   adversarial lo prueba.
+
+9. **"Mostrame que tu seguridad funciona, no me la cuentes."** — No lo cuentes: corré la **suite de
    red-team** (garak + probes custom) en CI; mostrá el reporte y el umbral que falla el build, y
    rompé algo a propósito para verla en rojo.
-7. **"¿garak o promptfoo? ¿Por qué?"** — Qué hace cada uno (**scanner** de vulnerabilidades vs
-   **framework de eval + red-team**) y por qué **los dos**: garak para el barrido adversarial genérico,
-   promptfoo/pytest para los ataques específicos de tu producto (cross-tenant, citation injection).
-   Ambos en el gate de M2.
-8. **"Nombrá los riesgos de OWASP LLM que tu sistema toca, por ID."** — **LLM01** (Prompt Injection),
-   **LLM02** (Sensitive Information Disclosure), **LLM08** (Vector & Embedding Weaknesses), **LLM09**
-   (Misinformation), **LLM06** (Excessive Agency, para los agentes de M6). Y por qué LLM01 es el #1.
-9. **"¿Por qué los tests de seguridad corren con los evals (M2) y no aparte?"** — Porque un test de
-   seguridad **es un eval adversarial**: entrada conocida (ataque) → salida esperada (que NO funcione).
-   Mismo harness, mismo CI, misma filosofía "se mide o no existe". Aparte, la seguridad quedaría sin
-   gate.
+
+10. **"¿garak o promptfoo? ¿Por qué?"** — Qué hace cada uno (**scanner** de vulnerabilidades vs
+    **framework de eval + red-team**) y por qué **los dos**: garak para el barrido adversarial genérico,
+    promptfoo/pytest para los ataques específicos de tu producto (cross-tenant, citation injection).
+    Ambos en el gate de M2.
+
+11. **"Nombrá los riesgos de OWASP LLM que tu sistema toca, por ID y nombre."** — **LLM01 Prompt
+    Injection**, **LLM02 Sensitive Information Disclosure**, **LLM06 Excessive Agency**, **LLM08
+    Vector & Embedding Weaknesses**, **LLM09 Misinformation**. Y por qué LLM01 es el #1.
+
+12. **"¿Por qué los tests de seguridad corren con los evals (M2) y no aparte?"** — Porque un test de
+    seguridad **es un eval adversarial**: entrada conocida (ataque) → salida esperada (que NO funcione).
+    Mismo harness, mismo CI, misma filosofía "se mide o no existe". Aparte, la seguridad quedaría sin
+    gate.
 
 **Gate:** marcalo como pasado en el panel del módulo cuando (a) la capa 1 está verde en Grounded —
 **con la suite de red-team (garak + cross-tenant + doc poisoning + PII) verde en CI** y demostrablemente
-roja cuando introducís una grieta —, y (b) escribiste tus respuestas a la capa 2.
+roja cuando introducís una grieta —, (b) escribiste tus respuestas a la capa 2 incluyendo el análisis
+de la trifecta del propio sistema, y (c) tenés el ADR del análisis M3↔M5 en `DECISIONS.md`.

@@ -1,26 +1,116 @@
 ---
 module: M5
 title: Security profundo + red-team
-concept: ACL-aware retrieval, PII redaction, prompt injection (directa e indirecta) y red-team adversarial en CI
+concept: ACL-aware retrieval, PII redaction, prompt injection (directa e indirecta), lethal trifecta, Agents Rule of Two y red-team adversarial en CI
 duration: ~8-10h lectura + 1-2 findes de práctica
 ---
 
 # M5 — Endurecer la seguridad y atacar tu propio sistema
 
 > **Qué vas a saber al terminar esta lección:** llevar el aislamiento *básico* de M4 (un namespace
-> por tenant) al nivel que se defiende en un loop de system design. Tres cosas nuevas: (1) que no
-> todos *dentro* de un tenant vean todo — **ACL-aware retrieval**, permisos por documento/rol;
-> (2) detectar y **redactar PII** en la ingesta y en las respuestas; (3) defenderte de **prompt
-> injection** directa e indirecta (OWASP **LLM01**) — incluyendo **doc poisoning**, donde un
-> documento ingestado lleva instrucciones maliciosas escondidas. Y lo que cierra el módulo: una
-> **suite de red-team adversarial con garak** corriendo en CI que *ataca* tu RAG (jailbreaks,
-> cross-tenant probing, citation injection) y falla el build si encuentra una grieta. Los tests de
-> seguridad son **evals adversariales**, y corren en el mismo gate que los evals de M2.
+> por tenant) al nivel que se defiende en un loop de system design. Cuatro cosas nuevas: (1) el
+> **threat model correcto para sistemas agentivos** — la **lethal trifecta** de Simon Willison
+> (jun-2025) y los **Agents Rule of Two** (nov-2025); (2) que no todos *dentro* de un tenant vean
+> todo — **ACL-aware retrieval**, permisos por documento/rol; (3) detectar y **redactar PII** en la
+> ingesta y en las respuestas; (4) defenderte de **prompt injection** directa e indirecta (OWASP
+> **LLM01**) — incluyendo **doc poisoning**, donde un documento ingestado lleva instrucciones
+> maliciosas escondidas. Y lo que cierra el módulo: una **suite de red-team adversarial con garak**
+> corriendo en CI que *ataca* tu RAG (jailbreaks, cross-tenant probing, citation injection) y falla
+> el build si encuentra una grieta. Los tests de seguridad son **evals adversariales**, y corren en
+> el mismo gate que los evals de M2.
 >
 > **Esto es Extended (post-checkpoint).** M4 ya te volvió contratable con aislamiento determinístico
 > básico. M5 es lo que convierte "aíslo tenants" en "diseñé el modelo de amenazas de un RAG B2B,
 > lo ataqué, y tengo la suite adversarial en CI que lo prueba". Es la diferencia entre *can-build*
 > y *can-defend-in-system-design* en seguridad.
+
+---
+
+## 0. La lethal trifecta y el Agents Rule of Two
+
+### La lethal trifecta de Willison (jun-2025)
+
+Simon Willison (simonwillison.net, 16-jun-2025, "The lethal trifecta for AI agents") definió el
+marco más útil para pensar la seguridad de sistemas agentivos:
+
+**Un agente es exfiltrable cuando tiene las tres propiedades simultáneamente:**
+
+1. **Acceso a datos privados** — puede leer información sensible (documentos de clientes, emails,
+   bases de datos propietarias).
+2. **Exposición a contenido no confiable** — procesa texto del exterior (docs ingestados, páginas
+   web, mensajes de usuarios, outputs de otros sistemas).
+3. **Capacidad de comunicación externa** — puede escribir hacia afuera (HTTP, email, webhooks, APIs
+   de terceros).
+
+Tener las tres a la vez significa que un atacante puede inyectar una instrucción en el contenido
+que el agente procesa (propiedad 2), hacer que exfiltre datos privados (propiedad 1) hacia afuera
+(propiedad 3). Sin las tres juntas, el ataque falla.
+
+**La única defensa probada es eliminar al menos una pata.** No existe un sistema de guardrails que
+prevenga el 95% de los ataques — Willison es explícito en esto. La defensa correcta es diseño de
+sistema: cortá los vectores de exfiltración.
+
+**Aplicado al sistema Grounded que construiste en M3:**
+
+| Propiedad | Grounded | Análisis |
+|---|---|---|
+| Acceso a datos privados | ✓ — docs de clientes, tickets de soporte | Inherente al producto |
+| Exposición a contenido no confiable | ✓ — docs ingestados, queries de usuarios | Inherente al producto |
+| Capacidad de comunicación externa | depende — `/chat` responde texto al usuario | La pata a controlar |
+
+El MCP server que construiste en M3 **amplía la superficie**: si el agente conectado al MCP server
+tiene acceso a herramientas externas (email, APIs, webhooks), las tres patas están presentes.
+Analizar la trifecta de tu sistema y documentar qué pata eliminás o restringís es parte de la
+defensa de M5.
+
+> **Checkpoint:** ¿por qué "buenas instrucciones en el system prompt" no resuelven la trifecta?
+> Porque la trifecta describe una propiedad arquitectónica del sistema, no del modelo. Un system
+> prompt no le saca al agente el acceso a datos ni la capacidad de comunicación externa. Lo único
+> que resuelve es diseño de sistema: no darle al agente capacidades que no necesita.
+
+### Agents Rule of Two (nov-2025)
+
+Inspirado en el "Rule of 2" de la seguridad de Chrome (ningún componente tiene más de 2 de:
+unsafe input, unsafe memory, high privilege), Willison formalizó en nov-2025 ("New prompt injection
+papers: Agents Rule of Two and The Attacker Moves Second", simonwillison.net):
+
+**Un agente no debe tener más de 2 de las 3 propiedades riesgosas de la trifecta.**
+
+Es la versión operativa de la trifecta: no es un principio binario ("¿seguro o no seguro?") sino
+un criterio de diseño que te dice cuándo un sistema es exfiltrable por construcción. Si tu agente
+tiene las tres, hay que quitar una antes de deployarlo.
+
+### Ataques reales documentados en 2025
+
+No es teoría. Estos sucedieron:
+
+- **Supabase MCP leak (6-jul-2025):** Willison documentó cómo el MCP server de Supabase podía
+  filtrar bases de datos SQL completas de usuarios a través de una secuencia de prompts maliciosos.
+  El vector: el server exponía demasiada superficie (acceso a datos + comunicación externa) y el
+  atacante explotó la trifecta.
+
+- **"Summer of Johann" (15-ago-2025):** serie de ataques masivos documentados por Willison a
+  integraciones MCP y GitHub de múltiples plataformas. El patrón consistente: inyección indirecta
+  a través de contenido procesado por el agente (issues de GitHub, comentarios, archivos) que
+  exfiltraba datos o ejecutaba acciones no autorizadas.
+
+El **MCP server que construiste en M3 ES una superficie de ataque**. Antes de publicarlo, analizá:
+¿cuántas patas de la trifecta tiene tu sistema cuando un agente lo usa? ¿Qué restricciones de
+scope le pusiste a las tools para limitar la capacidad de comunicación externa?
+
+### Escepticismo de guardrails de vendors
+
+Una aclaración importante para entrevistas: los productos de "guardrails" (shields, content
+moderation, output filtering de vendors) existen y complementan el diseño. Pero Willison es
+explícito:
+
+> *"Ningún producto de guardrails previene el 95% de los ataques — no existe solución probada
+> todavía."*
+
+Los guardrails de vendors son una capa probabilística. La defensa determinista — la que sí aguanta
+— es la que ya enseña este curso: aislamiento en SQL (no en el prompt), citas verificadas en
+código, ninguna acción gatillable por el contenido recuperado. Los guardrails complementan eso, no
+lo reemplazan.
 
 ---
 
@@ -60,24 +150,27 @@ Antes de defender, nombrá lo que defendés. El **OWASP Top 10 for LLM Applicati
 canónica de riesgos de apps con LLM — la que un entrevistador espera que conozcas por su ID. Las que
 tocan a un RAG de soporte, y que este módulo ataca:
 
-| ID | Riesgo | Cómo se manifiesta en Grounded | Dónde lo atacamos |
+| ID | Nombre exacto | Cómo se manifiesta en Grounded | Dónde lo atacamos |
 |---|---|---|---|
 | **LLM01** | **Prompt Injection** | Usuario (directa) o un doc ingestado (indirecta / poisoning) inyecta instrucciones que secuestran el comportamiento | §4, §5 |
 | **LLM02** | **Sensitive Information Disclosure** | PII en docs/respuestas/logs; el modelo filtra datos de otro usuario | §3 (PII), §6 (ACL) |
-| **LLM06** | **Excessive Agency** | El sistema actúa más allá de lo que debería (relevante cuando llegan los agentes de M6) | awareness, §7 |
+| **LLM06** | **Excessive Agency** | El sistema actúa más allá de lo que debería (relevante cuando llegan los agentes de M6); la lethal trifecta cuando el agente puede comunicarse externamente | awareness, §7; ver §0 |
 | **LLM08** | **Vector & Embedding Weaknesses** | Cross-tenant leakage por filtro débil; poisoning del índice; recuperar lo que no corresponde | §6, §7 |
 | **LLM09** | **Misinformation** | El sistema afirma con confianza algo falso o inyectado por un doc envenenado | §5, conecta con trust de M4 |
 
+> **Cómo citar en entrevista:** siempre ID + nombre exacto. "LLM01 — Prompt Injection", no solo
+> "prompt injection". La entrevista de seguridad evalúa si conocés el marco, no solo el concepto.
+>
 > **Nota de versión:** OWASP renumeró la lista entre 2023 y la edición 2025. Los IDs de arriba son
 > los de la edición vigente (2025). El que más vas a citar es **LLM01 (Prompt Injection)** — fue el
-> #1 en ambas ediciones, precisamente porque no hay un parche que lo cierre del todo. Citá el ID y
-> el nombre; demuestra que conocés el marco, no solo el concepto suelto.
+> #1 en ambas ediciones, precisamente porque no hay un parche que lo cierre del todo.
 
 > **Checkpoint:** ¿por qué prompt injection es LLM01 y no un bug que se arregla con un mejor prompt?
 > Porque el LLM no distingue *estructuralmente* entre tus instrucciones y el texto que le llega: para
 > el modelo, todo es la misma secuencia de tokens. No hay un "modo instrucción" y un "modo datos"
 > separados a nivel de arquitectura. Por eso la defensa no es un prompt mejor, es **diseño de
-> sistema** alrededor del modelo (§5).
+> sistema** alrededor del modelo (§5). Y por eso la lethal trifecta (§0) es un marco de diseño, no
+> de configuración.
 
 ---
 
@@ -453,6 +546,15 @@ genérico + específico de dominio) es exactamente el tipo de decisión que defe
 Al cerrar M5, un entrevistador de seguridad de LLMs podría disparar cualquiera de estas. Si no las
 respondés con tus palabras, tus defensas y tu suite, el módulo no está cerrado:
 
+- **"¿Qué es la lethal trifecta?"** (§0) — las 3 propiedades (acceso a datos privados + exposición
+  a contenido no confiable + comunicación externa); que su presencia simultánea hace exfiltrable al
+  sistema; que la defensa es eliminar una pata, no agregar guardrails; los ataques reales de 2025
+  (Supabase MCP, Summer of Johann).
+- **"¿Qué es el Agents Rule of Two?"** (§0) — máximo 2 de las 3 propiedades riesgosas en un
+  agente; si tiene las tres, hay que quitar una antes de deployar.
+- **"¿Tu MCP server de M3 es un vector de ataque? ¿Cómo lo limitaste?"** (§0) — análisis de la
+  trifecta del sistema Grounded + el MCP server; qué pata eliminaste o restringiste (scope de
+  tools, no darle capacidades externas innecesarias al agente).
 - **"¿Cómo defendés contra prompt injection?"** (§4-5) — directa vs indirecta; que NO hay 100%; las
   capas (separación instrucción/dato, no darle autoridad al retrieval, sanitización), y qué es
   estructural (aislamiento en SQL, citas verificadas) vs probabilístico (delimitadores en el prompt).
@@ -468,8 +570,9 @@ respondés con tus palabras, tus defensas y tu suite, el módulo no está cerrad
   probes custom) en CI, con el reporte y el umbral que falla el build.
 - **"¿garak o promptfoo?"** (§7) — qué hace cada uno, por qué los dos (barrido genérico + específico
   de dominio), y que corren en el gate de M2.
-- **"Nombrá los riesgos de OWASP LLM que tu sistema toca."** (§2) — LLM01 (injection), LLM02
-  (info disclosure), LLM08 (vector/embedding), LLM09 (misinformation), LLM06 (agency, para M6).
+- **"Nombrá los riesgos de OWASP LLM que tu sistema toca, por ID y nombre."** (§2) — **LLM01
+  Prompt Injection**, **LLM02 Sensitive Information Disclosure**, **LLM06 Excessive Agency**,
+  **LLM08 Vector & Embedding Weaknesses**, **LLM09 Misinformation**.
 
 Seguí con `material-apoyo.md` para las fuentes canónicas, después `practica.md` para construir las
 defensas y la suite, y cerrá con los **defense drills** de `pruebas.md`.

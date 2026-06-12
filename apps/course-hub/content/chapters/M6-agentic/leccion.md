@@ -1,18 +1,20 @@
 ---
 module: M6
-title: Agentic RAG + multi-agent + context engineering + reasoning-RAG
-concept: Cuándo el LLM decide los pasos (agent) vs cuándo vos los fijás (chain), y cómo se administra el contexto y se evalúa la trayectoria
-duration: ~8-10h lectura + 1-2 findes de práctica
+title: Agentic RAG + 5 patterns + harness engineering + multi-agent + context engineering + reasoning-RAG
+concept: Los 5 patterns de Anthropic, cuándo el LLM decide los pasos (agent) vs cuándo vos los fijás (chain), harness engineering, administración del contexto, y evaluación de trayectoria (trace grading)
+duration: ~10-12h lectura + 1-2 findes de práctica
 ---
 
 # M6 — Cuando el pipeline deja de ser una línea recta
 
-> **Qué vas a saber al terminar esta lección:** decidir, con criterio defendible, cuándo un
-> problema se resuelve con un **chain** (pipeline fijo) y cuándo con un **agent** (el LLM decide
-> los pasos); construir un grafo LangGraph con routing y multi-hop; nombrar y aplicar
-> **context engineering** como disciplina; explicar por qué los **reasoning models** rompen el
-> RAG document-level estándar; y —lo que el bar de entrevistas castiga si falta— **evaluar la
-> trayectoria** de un agente, no solo su respuesta final, reusando el harness de M2.
+> **Qué vas a saber al terminar esta lección:** nombrar y aplicar los **5 patterns de Anthropic**
+> (Prompt Chaining, Routing, Parallelization, Orchestrator-Workers, Evaluator-Optimizer) con su
+> trade-off; decidir, con criterio defendible, cuándo usar chain vs agent; entender qué es
+> **harness engineering** y por qué es lo difícil; aplicar las **4 estrategias de context
+> engineering** para agentes; construir un grafo LangGraph con routing y multi-hop; explicar por
+> qué los **reasoning models** rompen el RAG estándar; y —lo que el bar de entrevistas castiga si
+> falta— **evaluar la trayectoria completa** de un agente con trace grading, reusando el harness
+> de M2.
 
 Hasta acá (M0–M5) tu RAG fue una **línea recta**: query → hybrid retrieval → rerank → LLM con
 citations. Una sola pasada. Eso es un **chain**. Funciona perfecto para "buscá lo relevante y
@@ -60,7 +62,7 @@ Esta es **la** distinción que tenés que poder defender en una pizarra.
 | Costo | Bajo y **predecible** (N llamadas fijas). | Variable y potencialmente alto (loops). |
 | Latencia | Baja y predecible. | Variable; los loops la disparan. |
 | Failure modes | Los conocés y los testeás. | Loops infinitos, tool calls erróneos, se "va por las ramas", costo runaway. |
-| Cómo lo evaluás | Output final (M2). | Output **+ la trayectoria** (Sección 9). |
+| Cómo lo evaluás | Output final (M2). | Output **+ la trayectoria** (Sección 10). |
 | Debuggeo | Fácil (camino único). | Difícil (necesitás traces). |
 
 **La regla (de Anthropic, "Building Effective Agents"):** *empezá con la solución más simple
@@ -141,15 +143,162 @@ hechos porque no consulta nada externo; el *acting* solo (tool calls sin razonar
 *cuándo* parar ni *qué* buscar después. ReAct los **acopla**: el razonamiento decide la próxima
 acción, la observación corrige el razonamiento. Eso reduce alucinación y da una **trayectoria
 inspeccionable** (los Thought/Action/Observation son exactamente lo que vas a evaluar en la
-Sección 9).
+Sección 10).
 
 En la práctica no implementás el parser de ReAct a mano: LangGraph (o el tool-calling nativo del
 modelo) te da el loop. Pero **tenés que entender que ese loop es ReAct** para defenderlo y para
-saber qué evaluar.
+saber qué evaluar (los Thought/Action/Observation son la trayectoria que vas a medir en Sección 10).
 
 ---
 
-## 5. LangGraph: el agente como máquina de estados
+## 5. Los 5 patterns y el principio de simplicidad
+
+Antes de ver cómo implementar un agente con LangGraph, hay que entender los **building blocks**
+canónicos. Anthropic los documenta en "Building Effective Agents" (dic-2024) y son el vocabulario
+de entrevista de 2026 — si no los sabés nombrar, no sabés hablar de agentes.
+
+### 5.1 Los 5 patterns de Anthropic
+
+| Pattern | Qué hace | Cuándo usarlo |
+|---|---|---|
+| **Prompt Chaining** | Divide una tarea en una secuencia de llamadas donde el output de cada una alimenta la siguiente. | Tarea descomponible en pasos conocidos de antemano; máximo control y predictibilidad. |
+| **Routing** | Un clasificador (LLM barato o reglas) manda la query al camino más eficiente. | Mezcla de tipos de query con tratamiento distinto; quizás el patrón más alto ROI. |
+| **Parallelization** | Corre múltiples LLM calls en paralelo y combina resultados. Dos sub-variantes: *sectioning* (cada call maneja una parte del problema) y *voting* (múltiples calls independientes votan el mismo input para mayor confianza). | Tareas independientes que se pueden dividir; o cuando necesitás validación multi-perspectiva. |
+| **Orchestrator-Workers** | Un LLM orquestador descompone la tarea, delega a workers (LLMs o tools), y sintetiza resultados. | Tareas que requieren planificación dinámica donde los sub-tasks no se pueden predecir de antemano. |
+| **Evaluator-Optimizer** | Un LLM genera, otro evalúa, en un loop hasta que el output pasa el criterio. | Cuando hay criterio de calidad definible y el refinamiento iterativo mejora el resultado. |
+
+Estos patterns son **componibles**: el grafo LangGraph de la sección 6 implementa routing +
+orchestrator-workers + un loop que podría ser evaluator-optimizer. Pero en muchos casos el pattern
+correcto es el más simple — un Routing bien hecho resuelve el 80% de los casos que la gente
+sobre-ingenia con un orchestrator completo.
+
+### 5.2 Workflow vs agent (el trade-off central)
+
+Anthropic distingue dos categorías:
+
+- **Workflow (pipeline fijo):** el LLM ejecuta dentro de paths de código predefinidos. El
+  programador define el flujo completo. Prompt Chaining y Routing puros son workflows.
+- **Agent (decisión autónoma):** el LLM dirige dinámicamente su propio proceso y uso de tools,
+  decidiendo cuándo llamar qué y cuándo parar. Orchestrator-Workers y el loop multi-hop del
+  Evaluator-Optimizer son genuinamente agentivos.
+
+El trade-off no es "workflow malo, agente bueno". Es: **mayor autonomía → mayor flexibilidad →
+mayor failure surface**. Empezás con el pattern más simple que resuelve el problema y escalás
+complejidad solo cuando la medís necesaria.
+
+### 5.3 Simplicidad sobre frameworks: empezar con la API directa
+
+**"The most successful implementations weren't using complex frameworks."** — Anthropic, Building
+Effective Agents.
+
+Un LangGraph bien armado tiene mucho valor (tipeado, checkpointing, observabilidad). Pero
+añadirlo antes de entender el problema suele generar overhead sin beneficio. La recomendación
+de Anthropic es explícita: **empezar con la API directa**, entender el loop, después decidir si
+un framework agrega valor real.
+
+En la práctica: implementar un pattern con la API directa antes de refactorizar a LangGraph te
+obliga a entender qué hace el framework por vos — y a poder explicarlo. En la práctica del módulo
+(`practica.md`) vas a implementar primero el patrón evaluator-optimizer o routing directamente
+con la API, y recién después trasladar a LangGraph. Ese ejercicio es exactamente lo que enseña
+a defender "¿por qué usás LangGraph?" con algo más que "es popular".
+
+### 5.4 Harness engineering: lo difícil no es el agente
+
+> *"Agents aren't hard. The Harness is hard."* — swyx, keynote AIEWF, jun-2026
+
+El "harness" es todo lo que rodea al agente: el scaffolding que lo ejecuta, los artefactos de
+handoff, la gestión de errores, el logging, los guardrails, la integración con sistemas
+deterministas. Un agente mal harnessed puede ser correcto en el 90% de los casos y destruir
+valor en el 10% que no maneja bien (loops, tool failures, context overflow, cost runaway).
+
+Los componentes del harness que aparecen en el módulo:
+- **State management tipado** (AgentState de LangGraph) — el estado es el artefacto central del
+  harness.
+- **MAX_HOPS** — guardrail determinista contra loops infinitos.
+- **build_context** — gestión explícita del presupuesto de tokens.
+- **Trajectory logging** — observabilidad del camino, no solo del output.
+- **CI gate de trajectory eval** — el harness que verifica el harness (cierra el loop con M2).
+
+Para agentes long-running (los que corren minutos u horas en tareas complejas), el harness se
+vuelve aún más crítico. El patrón documentado por Anthropic ("Effective Harnesses for Long-Running
+Agents"):
+
+- **Initializer + worker:** dos fases separadas. El initializer entiende la tarea, configura el
+  contexto, y establece los artefactos de handoff. El worker ejecuta con acceso a esos artefactos.
+- **Artefactos de handoff:** un archivo de progreso (`claude-progress.txt`) + git history actúan
+  como memoria persistente entre sesiones. El agente que retoma una tarea puede leer su propio
+  historial de trabajo y continuar sin repetir pasos.
+- **Prompts estratificados por fase:** el prompt del initializer no es el mismo que el del worker —
+  tienen objetivos distintos y no deben mezclarse.
+
+> **Checkpoint:** ¿cuál es la diferencia entre el agente y el harness, y por qué importa?
+> El agente es el LLM + su loop de decisión. El harness es todo lo que lo rodea: scaffolding,
+> memoria, guardrails, logging, integración. Un agente sin harness no es production-ready. El
+> harness es la razón por la que "funciona en el demo" no implica "funciona en prod".
+
+---
+
+## 5b. Context engineering para agentes: las 4 estrategias de Anthropic
+
+Esta sección amplía la sección 8 con el framing exacto de Anthropic ("Effective Context Engineering
+for AI Agents"). Context engineering es, según Anthropic, **el #1 job de los ingenieros que
+construyen AI agents** desde mediados de 2025. El contexto inflado es el "silent killer" de la
+confiabilidad de los agentes.
+
+Las 4 estrategias canónicas:
+
+1. **Offload static** — lo que no cambia entre runs (instrucciones, reglas del sistema, ejemplos
+   fijos) va en el system prompt o en un archivo que se carga una vez. No lo regenerás en cada
+   llamada. Reduce tokens de contexto dinámico.
+
+2. **Retrieve just-in-time** — no metés todo lo que podrías necesitar upfront; recuperás solo lo
+   que el paso actual requiere. El retriever de M3 aplicado a agentes: el agente llama la tool de
+   retrieval cuando decide que la necesita, no al inicio.
+
+3. **Isolate per task (subagentes)** — cada subagente recibe solo el contexto que su tarea
+   específica necesita. El retriever agent no necesita el system prompt del answerer; el answerer
+   no necesita la historia de búsquedas fallidas. Cada agente tiene un contexto chico y enfocado.
+   Esto conecta directamente con la sección 6 (multi-agent).
+
+4. **Compress history (compaction)** — en agentes long-running o con muchos hops, el historial
+   acumula. En vez de arrastrarlo completo, **compactás**: resumís los pasos anteriores en un
+   resumen estructurado, descartás tool results que ya no son necesarios, te quedás solo con los
+   pasajes citables. Previene context overflow y context rot.
+
+La definición de Anthropic es precisa y vale la pena memorizar para defensa:
+> *"Context engineering = the smallest possible set of high-signal tokens that maximize the
+> likelihood of some desired outcome."*
+
+La conexión con la economía multi-agente es directa: más agentes = más contexto paralelo = más
+tokens = más costo. Las 4 estrategias son la forma de que esa multiplicación no sea exponencial.
+
+---
+
+## 5c. Economía multi-agente: el costo es una decisión de diseño
+
+Del multi-agent research system de Anthropic (jun-2025): un sistema multi-agente superó al single-
+agent Opus 4 en **90.2%** en el eval interno. Costo: **~15x tokens** respecto al single-agent.
+
+Ese trade-off hay que justificarlo con medición, no con intuición. **Si no podés cuantificar la
+mejora**, el 15x de costo no está justificado. Preguntas que tenés que poder responder:
+
+- ¿Cuánto mejora (en tu métrica de eval) pasar de single a multi-agent?
+- ¿Ese delta de calidad justifica el costo en tu caso de uso?
+- ¿El routing corta el camino para las queries simples (el 80%)? Si no, el costo se aplica a todo.
+
+En el sistema de Anthropic, task descriptions detalladas fueron críticas: objetivo, formato de
+output, herramientas disponibles, límites. Sin ellas, los subagentes duplicaban trabajo o dejaban
+gaps — lo cual multiplicaba el costo sin multiplica la calidad.
+
+> **En entrevista:** "¿cómo justificás el costo multi-agente?" La respuesta: "Medí el delta de
+> calidad en el eval antes y después. El 90.2% de mejora de Anthropic es un benchmark de
+> referencia; en mi sistema mido X% de mejora en trajectory eval y Y% en faithfulness sobre el
+> golden set. El routing garantiza que el camino caro solo se activa cuando el clasificador decide
+> que la query lo necesita — el 70% de las queries van por el path simple."
+
+---
+
+## 6. LangGraph: el agente como máquina de estados
 
 ¿Por qué LangGraph y no un `while` loop a mano, o LangChain `AgentExecutor`? Porque un agente es,
 literalmente, una **máquina de estados**: nodos (pasos) + edges (transiciones) + un **state**
@@ -166,7 +315,7 @@ compartido que cada nodo lee y actualiza. LangGraph hace explícito ese grafo. E
 - **Checkpointing / memoria.** El estado se puede persistir entre turnos → memoria conversacional
   sin pegar todo en el prompt.
 - **Observabilidad.** Cada paso por un nodo es un span trazable → conecta directo con Langfuse y
-  con la trajectory eval de la Sección 9.
+  con la trajectory eval de la Sección 10.
 
 ### El state
 
@@ -188,7 +337,7 @@ class AgentState(TypedDict):
 
 El campo `trajectory` es deliberado: con `Annotated[list, operator.add]` cada nodo *agrega* su
 paso (qué hizo, con qué args) en vez de sobreescribir. Esa lista **es** lo que vas a evaluar en
-la Sección 9. Lo dejamos en el state desde el día uno: la observabilidad no se atornilla después.
+la Sección 10. Lo dejamos en el state desde el día uno: la observabilidad no se atornilla después.
 
 ### Un grafo con router + multi-hop
 
@@ -267,7 +416,7 @@ reemplaza nada de lo anterior: lo **orquesta**.
 
 ---
 
-## 6. Multi-agent: dos agentes, y por qué (casi nunca)
+## 7. Multi-agent: dos agentes, y por qué (casi nunca)
 
 El graft de M6 es construir **dos agentes** LangGraph: un **retriever agent** (su trabajo: juntar
 el mejor contexto, con sus propios hops) y un **answer agent** (su trabajo: redactar la respuesta
@@ -285,7 +434,7 @@ START → │ retriever agent │  ───→  │ answer agent  │ → END
 - **Prompts/contextos divergentes.** El retriever razona sobre *búsqueda* (qué falta, qué query
   sigue); el answerer razona sobre *redacción fiel y citación*. Mezclarlos en un solo prompt
   diluye ambos. Separar = cada agente tiene un contexto chico y enfocado (esto es context
-  engineering, Sección 7).
+  engineering, Sección 8).
 - **Evaluabilidad independiente.** Podés medir "¿el retriever trajo lo correcto?" separado de
   "¿el answerer respondió fiel a lo que le dieron?". Aísla el origen de una falla.
 - **Reuso / swap.** Cambiás el retriever sin tocar el answerer.
@@ -308,7 +457,7 @@ START → │ retriever agent │  ───→  │ answer agent  │ → END
 
 ---
 
-## 7. Context engineering (tema de primera clase)
+## 8. Context engineering (tema de primera clase)
 
 Hasta ahora "armar el prompt" sonaba trivial: metés los chunks y la pregunta. **No lo es.**
 **Context engineering** es la disciplina de **diseñar y administrar exactamente qué información
@@ -338,7 +487,7 @@ sistema dinámico de información**. En el bar de entrevistas de 2025-2026 se pr
 4. **Presupuesto de tokens (budget).** Asignás explícitamente: X tokens para instrucción, Y para
    contexto recuperado, Z para historial, y reservás margen para la respuesta. Cuando algo se
    pasa, *recortás según prioridad*, no truncás a ciegas.
-5. **Aislamiento por agente.** (Conecta con Sección 6.) Cada sub-agente recibe solo el contexto
+5. **Aislamiento por agente.** (Conecta con Sección 7.) Cada sub-agente recibe solo el contexto
    que su tarea necesita. El retriever no necesita el system prompt de citación; el answerer no
    necesita la historia de búsquedas fallidas.
 
@@ -365,7 +514,7 @@ def build_context(question: str, docs: list[str], history: list[str], budget: in
 
 ---
 
-## 8. Reasoning-RAG: por qué o3/Opus/Gemini 2.5 rompen tu pipeline (awareness)
+## 9. Reasoning-RAG: por qué o3/Opus/Gemini 2.5 rompen tu pipeline (awareness)
 
 Hay un cambio de fondo que tenés que conocer aunque no lo construyas a fondo en este módulo.
 
@@ -406,7 +555,7 @@ estándar. ¿Por qué?
 
 ---
 
-## 9. Cerrar el loop de agent-eval (conecta con M2)
+## 10. Cerrar el loop de agent-eval: trace grading + trajectory evals (conecta con M2)
 
 Esto es **lo que más castiga el bar de entrevistas** si falta, y el motivo por el que M6 existe
 después de M2. La pregunta exacta: **"¿cómo evaluás un agente, no solo una respuesta?"**
@@ -418,9 +567,15 @@ incorrecto, o recuperó basura y tuvo suerte. Y puede **dar la respuesta incorre
 de trayectoria** identificable (no descompuso, paró un hop antes). Evaluar solo el output final
 es ciego a todo eso.
 
-**Trajectory eval** = evaluar la **secuencia de pasos** (qué tools llamó, en qué orden, con qué
-args), no solo el resultado. Lo enchufás al harness de M2 — que en M2 diseñaste **agnóstico al
-componente** justo para esto. Tres familias de métricas:
+**Trace grading / trajectory eval** = evaluar la **secuencia completa de pasos** (qué tools llamó
+el agente, en qué orden, con qué args, incluyendo handoffs entre subagentes), no solo el string
+final. El vocabulario exacto del mercado: OpenAI lo llama "trace grading" en sus guías oficiales
+y lo define como *"graders que scorean traces con criterios estructurados para encontrar
+regresiones y failure modes a escala"*. Anthropic lo implementa en el multi-agent research
+system para detectar cuándo los subagentes duplicaban trabajo.
+
+Lo enchufás al harness de M2 — que en M2 diseñaste **agnóstico al componente** justo para esto.
+Tres familias de métricas:
 
 1. **Tool-correctness.** ¿Llamó las tools correctas con los args correctos? Comparás la
    trayectoria real contra una **trayectoria esperada** (o un conjunto de tools que *deberían*
@@ -475,21 +630,85 @@ caja negra que "parece andar" y pasa a ser un componente con regresiones detecta
 
 ---
 
-## 10. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
+## 10b. Awareness: Agent SDKs como alternativas al framework
+
+El mercado no usa solo LangGraph. En los job listings de 2026 aparecen tres frameworks por nombre:
+
+| Framework | Posición | Qué aporta |
+|---|---|---|
+| **LangGraph** | #1 en producción enterprise | Stateful, graph explícito, checkpointing, multi-agent supervisor |
+| **Claude Agent SDK** | #2 | Potencia los agent loops internos de Anthropic; harness de 2 agentes, Agent Skills composables, tracing built-in |
+| **OpenAI Agents SDK** | #3 | Handoffs nativos (delegación como tool), guardrails input/output, sessions/memory (SQLite, Redis, Mongo), tracing by default |
+
+Los tres tienen en común: agent loop, tool use, tracing, y algún mecanismo de handoff/delegación.
+Lo que varía es el modelo mental:
+- LangGraph → grafo explícito de estados y transiciones.
+- Claude Agent SDK → harness + skills composables + brain/hands/session desacoplados.
+- OpenAI Agents SDK → handoffs como tool calls + guardrails de in/out.
+
+**No vas a implementar los tres en el módulo.** LangGraph sigue siendo la implementación del
+curso. Lo que sí tenés que poder defender: "conozco las alternativas, en qué se diferencian, y
+por qué elegí LangGraph para este caso". Awareness sin hype: las tres son herramientas válidas
+para distintos contextos. El criterio de selección importa más que la herramienta.
+
+## 10c. Sidebar — El patrón LLM Wiki de Karpathy (memoria navegable)
+
+Andrej Karpathy documentó en mayo 2026 un patrón de memoria para agentes que es una alternativa
+interesante al embedding search convencional: el **LLM Wiki**.
+
+La idea: en vez de guardar memorias como embeddings en un vector store y recuperarlas por
+similarity, mantenés un **archivo markdown navegable** (un "wiki") que el agente puede leer como
+un humano lee notas. Cada sección del wiki es un "artículo" sobre un concepto, entidad o
+decisión pasada.
+
+**Trade-offs respecto a embedding search:**
+
+| | LLM Wiki (markdown) | Embedding search (vector) |
+|---|---|---|
+| Recuperación | El agente lee el archivo completo o secciones navegables | Similarity search sobre embeddings |
+| Precision | Alta cuando el contenido está bien estructurado | Depende de la calidad de los embeddings |
+| Recall | Depende de que el agente sepa qué secciones leer | Cubre semántica latente que las palabras clave no capturan |
+| Mantenibilidad | El agente puede actualizarlo en lenguaje natural | Requiere re-indexar cuando cambia el contenido |
+| Costo de lectura | Alto en tokens si el wiki es grande | Bajo (solo los k chunks recuperados) |
+| Inspección humana | Trivial (es markdown) | Requiere herramienta de visualización |
+
+**Cuándo usar cada uno (esto es lo que defendés):**
+- **LLM Wiki**: dominios bien estructurados, base de conocimiento chica, cuando la inspección
+  humana y la mantenibilidad importan, o cuando el agente necesita razonar sobre la estructura
+  del conocimiento (no solo recuperar un chunk).
+- **Embedding search**: bases grandes, semántica latente importante, retrieval de alta velocidad
+  a escala.
+
+Este sidebar no es un cambio de práctica en el módulo — usás pgvector de M3 para retrieval.
+Es **awareness de diseño**: hay alternativas de memoria con trade-offs distintos que vas a
+encontrar en la literatura y en entrevistas.
+
+---
+
+## 11. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
 
 Al cerrar M6, un entrevistador podría preguntarte cualquiera de estas. Si no las respondés con
 tus palabras y tus decisiones, el módulo no está cerrado:
 
+- "**Nombrá los 5 patterns de Anthropic y cuándo usarías cada uno.**" (Sección 5.1) — y el
+  trade-off workflow vs agent.
+- "**¿Por qué empezarías con la API directa antes de un framework?**" (Sección 5.3) — simplicidad
+  sobre frameworks; lo que el framework hace por vos.
+- "**¿Qué es el harness y por qué es lo difícil?**" (Sección 5.4) — scaffolding, guardrails,
+  logging, handoff para long-running.
 - "**Agent vs chain: ¿cuándo cada uno?**" (Sección 2) — y un caso donde *no* usarías agente.
 - "Mostrame tu grafo LangGraph. ¿Dónde está el routing y dónde el loop? ¿Cómo evitás loops
-  infinitos?" (Sección 5, `MAX_HOPS`)
-- "¿Por qué multi-agent acá, y cuándo sería sobre-ingeniería?" (Sección 6)
-- "**Explicame context engineering.**" Nombrá las palancas: selección, orden, compresión, budget,
-  aislamiento. (Sección 7)
-- "**¿Cómo evaluás un agente, no solo una respuesta?**" — trajectory eval por el harness de M2.
-  (Sección 9) — *la más probable y la más castigada si la fallás.*
-- "**¿Cómo adaptás RAG para un reasoning model** (o3 / extended thinking / Gemini 2.5)?" — System 1
-  vs System 2, retrieval-as-tool, recuperar más grueso, rutear por modelo. (Sección 8)
+  infinitos?" (Sección 6, `MAX_HOPS`)
+- "¿Por qué multi-agent acá, y cuándo sería sobre-ingeniería? ¿Cómo justificás el costo 15x?"
+  (Sección 7 + 5c)
+- "**Explicame context engineering.**" Las 4 estrategias de Anthropic (offload static, retrieve
+  JIT, isolate per task, compress history) + las palancas de implementación. (Secciones 5b y 8)
+- "**¿Cómo evaluás un agente, no solo una respuesta?**" — trajectory eval + trace grading por el
+  harness de M2. (Sección 10) — *la más probable y la más castigada si la fallás.*
+- "**¿Cómo adaptás RAG para un reasoning model** (o3 / extended thinking / Gemini 2.5)?" —
+  System 1 vs System 2, retrieval-as-tool, recuperar más grueso, rutear por modelo. (Sección 9)
+- "**¿Qué diferencia LangGraph, el Claude Agent SDK y el OpenAI Agents SDK?**" (Sección 10b)
+  — awareness de alternativas, criterio de selección.
 
 Seguí con `material-apoyo.md` para las fuentes canónicas, después `practica.md` para construirlo
 en Grounded, y cerrá con los defense drills de `pruebas.md`.

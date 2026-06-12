@@ -23,6 +23,116 @@ cuando un paso depende del anterior, y que **cada cambio del grafo se mida** por
 
 ---
 
+## Paso 0 — Un pattern con la API directa (antes del framework)
+
+**Por qué:** "The most successful implementations weren't using complex frameworks" (Anthropic).
+Antes de abrir LangGraph, implementá UN pattern con la API directa. Esto te obliga a entender
+qué hace el framework por vos — y es lo que te permite defenderlo.
+
+**Hacer:** elegí uno de los dos:
+
+**Opción A — Evaluator-Optimizer con API directa:**
+```python
+# services/api/agent/patterns/evaluator_optimizer.py
+# Implementación directa: generador + evaluador en loop, sin framework.
+import anthropic
+from pydantic import BaseModel
+
+client = anthropic.Anthropic()
+
+class EvalResult(BaseModel):
+    passes: bool
+    feedback: str
+
+def generate(question: str, context: str) -> str:
+    """El generador: produce una respuesta."""
+    resp = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": f"Contexto:\n{context}\n\nPregunta: {question}"}],
+    )
+    return resp.content[0].text
+
+def evaluate(question: str, answer: str, context: str) -> EvalResult:
+    """El evaluador: ¿la respuesta pasa el criterio?"""
+    resp = client.messages.parse(
+        model="claude-haiku-4-5",
+        max_tokens=512,
+        messages=[{"role": "user", "content":
+            f"Q: {question}\nA: {answer}\nContext: {context}\n"
+            "¿La respuesta está completamente respaldada por el contexto? "
+            "Si no, qué falta. JSON: {passes: bool, feedback: str}"}],
+        output_format=EvalResult,
+    )
+    return resp.parsed_output
+
+def evaluator_optimizer(question: str, context: str, max_iterations: int = 3) -> str:
+    """Loop: generar → evaluar → refinar hasta pasar el criterio."""
+    answer = generate(question, context)
+    for i in range(max_iterations):
+        result = evaluate(question, answer, context)
+        if result.passes:
+            return answer
+        # El feedback del evaluador alimenta la siguiente generación
+        feedback_prompt = f"Mejorá esta respuesta. Feedback del evaluador: {result.feedback}\nRespuesta actual: {answer}"
+        answer = generate(feedback_prompt, context)
+    return answer
+```
+
+**Opción B — Routing con API directa:**
+```python
+# services/api/agent/patterns/routing.py
+# Un clasificador LLM que manda al handler correcto.
+import anthropic
+from pydantic import BaseModel
+from typing import Literal
+
+client = anthropic.Anthropic()
+
+class RouteDecision(BaseModel):
+    route: Literal["simple", "multi", "decline"]
+    reason: str
+
+def classify(question: str) -> RouteDecision:
+    resp = client.messages.parse(
+        model="claude-haiku-4-5",
+        max_tokens=256,
+        messages=[{"role": "user", "content":
+            f"Clasificá esta pregunta de soporte:\n'{question}'\n"
+            "- 'simple': una sola recuperación alcanza\n"
+            "- 'multi': necesita comparación / múltiples temas\n"
+            "- 'decline': fuera del scope de soporte\n"
+            "JSON: {route: 'simple'|'multi'|'decline', reason: str}"}],
+        output_format=RouteDecision,
+    )
+    return resp.parsed_output
+
+def handle_simple(question: str) -> str:
+    return f"[single-shot RAG para: {question}]"  # conectá con tu retrieval de M3
+
+def handle_multi(question: str) -> str:
+    return f"[fan-out multi-query para: {question}]"  # conectará con el grafo
+
+def handle_decline(reason: str) -> str:
+    return f"Esta pregunta está fuera de lo que puedo responder con la documentación disponible."
+
+def route(question: str) -> str:
+    decision = classify(question)
+    if decision.route == "simple":
+        return handle_simple(question)
+    elif decision.route == "multi":
+        return handle_multi(question)
+    else:
+        return handle_decline(decision.reason)
+```
+
+**Verificar:** el pattern elegido funciona sobre 5 queries reales. Podés explicar, **línea por
+línea**, qué hace cada parte — sin el framework. Documentá en `DECISIONS.md` qué te compra
+LangGraph respecto a esta implementación directa (state tipado, checkpointing, observabilidad,
+edges condicionales). Si no podés nombrarlo, no estás listo para el grafo.
+
+---
+
 ## Paso 1 — El state tipado y la trayectoria
 **Hacer:** creá `services/api/agent/state.py` con el `AgentState` (`TypedDict`): `question`,
 `sub_queries`, `documents`, `answer`, `route`, y **`trajectory: Annotated[list[dict],
@@ -101,10 +211,14 @@ está cerrado.
 ## Paso 8 — Capa de defensa (el entregable real)
 **Hacer:**
 - `DECISIONS.md`:
+  - **ADR-M6-0:** "API directa vs LangGraph" — qué implementaste directo con la API (Paso 0), qué
+    te aportó el ejercicio, y qué compra LangGraph: state tipado, checkpointing, conditional edges,
+    observabilidad. Por qué el framework justifica su overhead en este caso.
   - **ADR-M6-a:** "Agent vs chain para Grounded" — por qué *no* convertís todo en agente; qué
     queda como chain (FAQs); qué dispara el camino agentic; cómo evitás loops infinitos.
-  - **ADR-M6-b:** "Multi-agent: 2 agentes" — el beneficio concreto (evaluabilidad + enfoque
-    separados), por qué *no* más de 2, cuándo lo colapsarías a uno.
+  - **ADR-M6-b:** "Multi-agent: 2 agentes + economía" — el beneficio concreto (evaluabilidad +
+    enfoque separados), la mejora medida en eval que justifica el ~15x de costo tokens, por qué
+    *no* más de 2, cuándo lo colapsarías a uno.
   - **ADR-M6-c:** "Reasoning-RAG / System 1 vs System 2" — cómo adaptarías el pipeline para o3 /
     extended thinking / Gemini 2.5 (retrieval-as-tool, recuperar más grueso, rutear por modelo) y
     por qué hoy seguís en System 1 por costo/latencia. Taggealos `Module: M6`.

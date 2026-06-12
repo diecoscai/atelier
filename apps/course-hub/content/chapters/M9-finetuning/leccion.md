@@ -270,6 +270,50 @@ es lo que demuestra mejora. Formas de medir, de menos a más rigurosas:
 
 ## 7. La pregunta de system design: ¿cuándo fine-tune le gana a RAG?
 
+### El decision framework de OpenAI (y por qué el orden importa)
+
+Antes de evaluar técnicas, el framework de la plataforma OpenAI establece un orden de prioridad
+claro que el mercado adoptó como estándar:
+
+```
+prompting  →  RAG  →  fine-tuning
+  (horas)    (datos en   (último recurso,
+             tiempo real) con eval métrica definida)
+```
+
+**El 80% de los casos donde alguien propone un fine-tune se resuelven mejor con un prompt
+mejorado, algunos ejemplos few-shot, o un pipeline de RAG.** El fine-tuning solo entra cuando
+has agotado esas opciones y podés articular con precisión por qué no funcionaron.
+
+**Regla de oro antes de abrir el notebook:**
+
+> *"No hagas fine-tune hasta que puedas enunciar claramente cuál es tu métrica de eval y por qué
+> el prompting no puede moverla."*
+
+Esto conecta directo con el harness de M2: si no podés medir la mejora con el golden dataset y el
+judge de M2, no tenés la condición para justificar el fine-tune. La métrica de eval es el contrato.
+
+Llevado a Grounded: si querés que el bot "responda siempre en formato JSON con estructura fija y
+en tono formal", el primer intento es prompting + structured outputs (M4). Si después de iterar el
+harness muestra que el cumplimiento de formato es insuficiente y la métrica no sube — ahí el
+fine-tune está justificado. Sin ese proceso documentado en `DECISIONS.md`, la propuesta de
+fine-tunear es prematuro.
+
+### Los métodos disponibles y sus condiciones (awareness)
+
+No todos los modelos son fine-tuneables, y los métodos disponibles dependen del modelo:
+
+| Método | Cuándo usar | Modelos compatibles (referencia jun-2026) |
+|---|---|---|
+| **SFT** (Supervised Fine-Tuning) | comportamiento, formato, estilo | GPT-4.1, GPT-4.1-mini |
+| **DPO** (Direct Preference Optimization) | alinear a preferencias humanas, comparativas | GPT-4.1, GPT-4.1-mini |
+| **RFT** (Reinforcement Fine-Tuning) | tareas de razonamiento que requieren "pensar" | solo reasoning models (ej. o4-mini) |
+| **No fine-tuneable** | usar vía API/prompting/RAG únicamente | GPT-5.x (modelos frontier más nuevos) |
+
+Awareness para entrevistas: cuando cites fine-tuning, nombra el método y verifica que el modelo
+que proponés lo soporte. "Haría fine-tuning con GPT-5" es una respuesta que delata no haber
+revisado las restricciones de la plataforma.
+
 Esta es **la** pregunta del módulo. La respuesta mediocre es "depende". La respuesta de engineer
 tiene un eje claro:
 
@@ -284,13 +328,14 @@ tiene un eje claro:
 La heurística para defender:
 - **RAG es para CONOCIMIENTO. Fine-tune es para COMPORTAMIENTO** (formato, estilo, dominio,
   skill). Conocimiento que cambia → RAG, siempre. No fine-tunees hechos.
-- **Casi nunca es uno u otro: se combinan.** El patrón real en producción es **fine-tunear el
-  comportamiento + RAG para el conocimiento fresco**: un modelo fine-tuneado para *responder con
-  el tono y formato de tu soporte*, alimentado con *los docs recuperados por RAG*. Lo mejor de
-  los dos.
-- **Empezá por RAG y prompting.** Fine-tune es el último recurso cuando prompting + RAG no logran
-  el comportamiento que necesitás, y tenés datos suficientes (cientos-miles de ejemplos de
-  calidad). Fine-tunear antes de agotar prompting es over-engineering.
+- **El patrón híbrido 2026 es la norma en producción:** RAG para hechos + fine-tuning para
+  estilo/política/decisión. Un modelo fine-tuneado para *responder con el tono y formato de tu
+  soporte*, alimentado con *los docs recuperados por RAG*. No es uno u otro — es la secuencia
+  correcta: primero RAG, después (si hace falta) fine-tune encima.
+- **Empezá por prompting y RAG** (en ese orden, per el decision framework de §7). Fine-tune es el
+  último recurso cuando prompting + RAG no logran la métrica que definiste, y tenés datos
+  suficientes (cientos-miles de ejemplos de calidad). Fine-tunear antes de agotar prompting es
+  over-engineering que se paga con tiempo y costo sin evidencia de necesidad.
 
 > **Checkpoint:** un cliente quiere que el bot "responda siempre citando el número de ticket y en
 > tono formal, usando *nuestra* base de conocimiento que actualizamos a diario". ¿Fine-tune o RAG?
@@ -432,5 +477,19 @@ con tus palabras (y, donde aplica, tus números del ejercicio), el módulo no es
 - "¿Qué es precision vs recall y cuál priorizarías para tu router de intents?" (Sección 9)
 - "¿Cómo evaluaste que el fine-tune sirvió?" → eval before/after, no solo la train loss.
   (Sección 6.4)
+- "¿Cuándo harías fine-tune en vez de prompting o RAG? Dame el criterio." → el decision framework:
+  prompting → RAG → fine-tune; solo cuando podés enunciar la métrica de eval que el prompting no
+  mueve. (Sección 7)
+- "¿Qué método de fine-tuning usarías y en qué modelo?" → nombrar SFT/DPO/RFT según el caso, y
+  verificar que el modelo lo soporte (GPT-5.x no es fine-tuneable; RFT solo en reasoning models).
+  (Sección 7)
+
+**El drill de defensa crítico de este módulo:**
+> *"¿Cuál es la métrica de eval que no se mueve con prompting y que justifica tu propuesta de
+> fine-tune?"*
+>
+> Si no podés responder esto con un número del harness de M2 y una justificación de por qué el
+> prompting tocó el techo, la propuesta de fine-tune no está lista. Esa es exactamente la pregunta
+> que un tech lead o un entrevistador serio te va a hacer.
 
 Seguí con `material-apoyo.md` para las fuentes canónicas, y después `practica.md` para correrlo.

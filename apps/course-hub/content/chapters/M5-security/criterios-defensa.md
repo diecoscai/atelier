@@ -8,11 +8,31 @@ Al terminar M5 tenés que poder, en el nivel honesto indicado. M5 es Extended y 
 listón en los temas core (injection, ACL, red-team) es *can-defend-in-system-design*, no solo
 *can-explain* — un entrevistador de seguridad de LLMs no se conforma con definiciones.
 
+## Lethal trifecta y Agents Rule of Two
+
+- **(can-explain)** La **lethal trifecta** de Simon Willison (simonwillison.net, 16-jun-2025): un
+  agente con (1) acceso a datos privados + (2) exposición a contenido no confiable + (3) capacidad
+  de comunicación externa es exfiltrable. La única defensa probada = eliminar al menos una pata /
+  cortar vectores de exfiltración. Willison: *"ningún producto de guardrails previene el 95% de los
+  ataques — no existe solución probada todavía."* Los guardrails de vendors complementan, no
+  reemplazan, el diseño determinista.
+- **(can-explain)** Los **Agents Rule of Two** (Willison, nov-2025): máximo 2 de las 3 propiedades
+  riesgosas en un agente. Si tiene las tres, hay que quitar una antes de deployar.
+- **(can-build)** Análisis de la **trifecta del propio sistema Grounded**: las tres propiedades,
+  cuál pata eliminaste o restringiste, y cómo documentaste esa decisión en `DECISIONS.md`.
+- **(can-defend-in-system-design)** "¿Tu MCP server (M3) es un vector de ataque? ¿Cómo lo
+  limitaste?" — scope de tools del server, capacidades externas que el agente no tiene, qué parte
+  de la trifecta controlaste. Conectar M3↔M5 en la defensa.
+- **(awareness)** Ataques reales de 2025: Supabase MCP leak (Willison, 6-jul-2025) y "Summer of
+  Johann" (Willison, 15-ago-2025) — ataques masivos a integraciones MCP y GitHub. El patrón: la
+  trifecta explotada en producción.
+
 ## Modelo de amenazas (OWASP LLM Top 10)
 
-- **(can-explain)** Nombrar los riesgos de OWASP LLM que tu sistema toca por su **ID y nombre**:
-  **LLM01** (Prompt Injection), **LLM02** (Sensitive Information Disclosure), **LLM08** (Vector &
-  Embedding Weaknesses), **LLM09** (Misinformation), y **LLM06** (Excessive Agency, para M6).
+- **(can-explain)** Nombrar los riesgos de OWASP LLM que tu sistema toca por su **ID y nombre
+  exacto**: **LLM01 Prompt Injection**, **LLM02 Sensitive Information Disclosure**, **LLM06
+  Excessive Agency** (incluye la trifecta cuando el agente tiene comunicación externa), **LLM08
+  Vector & Embedding Weaknesses**, **LLM09 Misinformation**. En entrevista: ID + nombre siempre.
 - **(can-explain)** Por qué **LLM01 es el #1** y no se cierra con un prompt mejor: el LLM no separa
   instrucción de dato a nivel arquitectónico — todo es la misma secuencia de tokens.
 
@@ -77,5 +97,6 @@ listón en los temas core (injection, ACL, red-team) es *can-defend-in-system-de
 > **Alcance M5 vs lo que sigue:** M5 endurece el aislamiento de M4 a nivel defendible en system design
 > para un RAG single-shot. **LLM06 (Excessive Agency)** se vuelve crítico recién con los **agentes de
 > M6**: ahí la regla "el contenido del retrieval no puede gatillar una acción/tool" pasa de buena
-> práctica a requisito duro. Saber dónde termina lo que construiste en M5 (defensas de un RAG, no de
-> un agente) es parte de la defensa madura.
+> práctica a requisito duro, y la lethal trifecta se vuelve el marco de diseño de cada arquitectura
+> de agente. Saber dónde termina lo que construiste en M5 (defensas de un RAG, no de un agente) y
+> qué se extiende a M6 (la trifecta, los Rule of Two) es parte de la defensa madura.

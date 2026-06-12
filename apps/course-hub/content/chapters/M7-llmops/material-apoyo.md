@@ -24,8 +24,9 @@ referencia para consultar mientras construís, o profundización opcional. Para 
 
 3. **Chip Huyen — "AI Engineering" (O'Reilly, 2025), capítulos de inference optimization y cost**
    El marco conceptual de costo/latencia del módulo. Buscá: la descomposición de latencia
-   (incluida **TTFT** vs total), el trade-off costo/latencia/calidad, prompt caching, y la sección
-   de inference optimization (quantization, batching). Es la fuente que te da autoridad cuando te
+   (incluida **TTFT** vs total), el trade-off costo/latencia/calidad, **prompt caching**,
+   **distillation** como patrón de transferencia de capacidad entre modelos, y la sección de
+   inference optimization (quantization, batching). Es la fuente que te da autoridad cuando te
    preguntan "¿de dónde sacaste esto?". ~1-2h para los capítulos relevantes.
 
 4. **pgvector — README (releído con otra intención) + "Semantic caching" pattern**
@@ -39,13 +40,19 @@ referencia para consultar mientras construís, o profundización opcional. Para 
 
 ## Referencia (tené a mano mientras construís)
 
-- **OpenAI — Pricing** `openai.com/api/pricing` — los números reales para tu tabla de costo
-  (input vs output, `gpt-4o` vs `gpt-4o-mini`). **No memorices los precios** — cambian; aprendé la
-  *relación* (~20-30x) y el método.
-- **OpenAI — "Prompt caching"** (`platform.openai.com/docs`, sección prompt caching) — el cache de
-  *prefijo* del proveedor (§4); cómo estructurar el prompt (estable adelante) para maximizar el hit.
+- **OpenAI — Pricing** `openai.com/api/pricing` — los números reales para tu tabla de costo.
+  **No memorices los precios** — cambian con cada generación; aprendé la *relación* (~20-30x entre
+  tier barato y frontier) y el método.
+- **OpenAI — "Prompt caching" (guía oficial)** `developers.openai.com/api/docs/guides/prompt-caching`
+  — el cache de prefijo del proveedor (§3 de la lección): automático ≥1.024 tokens, hits en
+  bloques de 128, ~50% de descuento. Leé el layout "estable adelante" y los ejemplos de cuándo
+  NO se produce un hit.
+- **OpenAI — Cookbook `prompt_caching_201`** `cookbook.openai.com` — casos de uso avanzados:
+  extended caching, multi-turn con prefijo estable, medición del hit rate. Útil para el ADR de
+  estructura de prompt en Grounded.
 - **Anthropic — "Prompt caching"** (docs de Anthropic) — el equivalente con control explícito
-  (`cache_control`); útil para contrastar con el automático de OpenAI.
+  (`cache_control`); útil para contrastar con el automático de OpenAI. La API de Anthropic pide que
+  marques explícitamente los breakpoints; la de OpenAI lo detecta sola.
 - **tiktoken** `github.com/openai/tiktoken` — contar tokens para los budgets de §4.
 - **OpenAI structured outputs / `response_format`** (`platform.openai.com/docs`) — para el router
   que devuelve `{"complexity": ...}` (lo viste en M4 con Instructor/Pydantic).

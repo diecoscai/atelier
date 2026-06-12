@@ -18,7 +18,8 @@ gate: pending
 - [ ] El **golden dataset** (`evals/golden.jsonl`) tiene ≥50 ejemplos estratificados por la
       taxonomía, incluyendo **casos negativos** (respuesta no presente → la verdad es "no sé").
 - [ ] El **LLM-judge** corre con output estructurado y está **validado**: `judge_validation.md`
-      muestra ≥80% de acuerdo con labels humanos sobre 20-30 casos.
+      muestra ≥80% de acuerdo con labels humanos sobre 20-30 casos, con **Cohen's Kappa ≥ 0.61**
+      (acuerdo substancial). Si κ < 0.40, el judge no está listo — reescribí el criterio.
 - [ ] El **CI gate** (GitHub Actions) corre el harness en cada PR y **falla cuando una métrica
       baja**: un PR que empeora el retrieval a propósito (ej. `k=1`) rompe el CI; revertir lo
       arregla.
@@ -46,23 +47,33 @@ gate: pending
    contexto) ≠ answer relevancy (responde la pregunta) ≠ context precision/recall (calidad del
    contexto). Que no se te confundan.
 
-5. **"¿Cómo funciona tu LLM-judge, qué sesgos tiene, y cómo sabés que es confiable?"** — Cómo
-   juzga, los sesgos (position/verbosity/self-preference) + mitigaciones, y sobre todo: **validado
-   contra labels humanos, X% de acuerdo**. Un judge sin validar es vibes-based.
+5. **"¿Cuándo usás un eval code-based vs un LLM-judge?"** — Code-based cuando el criterio es
+   unívoco (recall@k, formato, presencia de cita). LLM-based cuando se requiere juicio semántico
+   (faithfulness, answer relevancy). No mezclarlos sin criterio. Este es el eje de diseño de
+   tu harness — si respondés "uso LLM-judge para todo", reprobaste.
 
-6. **"¿Por qué un modelo barato y separado para el judge?"** — Barato porque corre en cada commit;
+6. **"¿Cómo alineás tu judge con juicio humano experto? ¿Qué es Cohen's Kappa?"** — SME
+   alignment: etiquetás 20-30 casos a mano, corrés el judge, calculás κ. Kappa corrige el acuerdo
+   por azar. κ < 0.40 → el judge no sirve; κ ≥ 0.61 → substancial, confiable para producción.
+   Defendé tu kappa y qué casos discrepan.
+
+7. **"¿Cómo funciona tu LLM-judge, qué sesgos tiene, y cómo sabés que es confiable?"** — Cómo
+   juzga, los sesgos (position/verbosity/self-preference) + mitigaciones, y sobre todo: **validado
+   contra labels humanos con Cohen's Kappa**. Un judge sin validar es vibes-based.
+
+8. **"¿Por qué un modelo barato y separado para el judge?"** — Barato porque corre en cada commit;
    separado del generador para evitar self-preference bias.
 
-7. **"¿Cómo construiste el golden dataset y por qué en M2 y no en M1?"** — Synthetic Q&A contra
+9. **"¿Cómo construiste el golden dataset y por qué en M2 y no en M1?"** — Synthetic Q&A contra
    docs reales, estratificado por la taxonomía. En M2 porque (a) docs reales, no toy, (b) derivado
    de la taxonomía que recién existe acá, (c) estable a través de los cambios de M3.
 
-8. **"¿Qué pasa en tu CI cuando un cambio baja una métrica?"** — Regression gate: el job falla y
-   bloquea el merge. Demostralo con el PR que rompiste a propósito.
+10. **"¿Qué pasa en tu CI cuando un cambio baja una métrica?"** — Regression gate: el job falla y
+    bloquea el merge. Demostralo con el PR que rompiste a propósito.
 
-9. **"¿Cómo evaluarías un *agente* (no solo una respuesta) con este harness?"** — El harness es
-   agnóstico al componente: toma un trace genérico. En M6, el trace es la trayectoria de tools del
-   agente; agregás evaluadores de trajectory/tool-correctness sin reescribir la infraestructura.
+11. **"¿Cómo evaluarías un *agente* (no solo una respuesta) con este harness?"** — El harness es
+    agnóstico al componente: toma un trace genérico. En M6, el trace es la trayectoria de tools del
+    agente; agregás evaluadores de trajectory/tool-correctness sin reescribir la infraestructura.
 
 **Gate:** marcalo como pasado en el panel del módulo cuando (a) la capa 1 está verde en Grounded
 (harness corriendo, CI gate agarra una regresión real, dashboard live) y (b) escribiste tus

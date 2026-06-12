@@ -32,9 +32,9 @@ con riesgo de margen. Si un cliente manda 10x más queries de lo que asumiste, o
 crecen sin control, tu COGS (cost of goods sold) se come la ganancia y no te enterás hasta que ves
 la factura de OpenAI a fin de mes.
 
-Hagamos el número, porque en la entrevista lo van a pedir. Supongamos `gpt-4o` a ~$2.50 / 1M tokens
-de input y ~$10 / 1M de output (los precios cambian; lo que no cambia es el método). Una
-conversación de soporte típica con RAG:
+Hagamos el número, porque en la entrevista lo van a pedir. Supongamos un modelo frontier a ~$2.50
+/ 1M tokens de input y ~$10 / 1M de output (los precios cambian con cada generación; lo que no
+cambia es el método). Una conversación de soporte típica con RAG:
 
 - **Input por turno:** instrucción + 5 chunks recuperados (~2.000 tokens) + historial (~1.000) ≈
   **3.000 tokens de input**.
@@ -50,6 +50,7 @@ Las cuatro palancas de este módulo atacan ese número desde ángulos distintos 
 
 | Palanca | Qué reduce | Ahorro típico |
 |---|---|---|
+| **Prompt caching** | el precio de tokens repetidos (prefijo estable → descuento automático del proveedor) | 60-85% del costo de input en prompts con contexto largo |
 | **Model routing** | el precio por token (query simple → modelo barato) | 70-80% del gasto de generación |
 | **Semantic caching** | la *cantidad* de llamadas (preguntas repetidas no pegan al LLM) | 30-60% de hit rate en soporte |
 | **Token/context budgets** | los tokens por llamada (no desperdiciás context window) | 20-50% del input |
@@ -67,16 +68,23 @@ Las cuatro palancas de este módulo atacan ese número desde ángulos distintos 
 ### Por qué
 
 No todas las queries necesitan el mismo cerebro. "¿Cuál es el horario de atención?" la contesta un
-modelo barato (`gpt-4o-mini`, `claude-haiku`, o un Llama 3.1 8B local) con un chunk de contexto.
-"Comparame el plan Enterprise vs Pro para un equipo de 200 con SSO y data residency en la UE, y
-decime si me conviene migrar" necesita razonamiento multi-paso y un modelo caro. Pagar el modelo
-caro para *toda* query es como mandar a un cirujano a poner una curita: funciona, pero el costo es
-absurdo.
+**modelo barato** (el tier "mini/haiku/flash" del proveedor que uses, o un Llama local) con un
+chunk de contexto. "Comparame el plan Enterprise vs Pro para un equipo de 200 con SSO y data
+residency en la UE, y decime si me conviene migrar" necesita razonamiento multi-paso y un **modelo
+frontier**. Pagar el modelo frontier para *toda* query es como mandar a un cirujano a poner una
+curita: funciona, pero el costo es absurdo.
 
-`gpt-4o-mini` cuesta **~20-30x menos** que `gpt-4o`. Si el 70-80% de tus queries son "simples" (y en
-soporte lo son: FAQ, lookups, confirmaciones), rutear esas al modelo barato te ahorra el grueso del
-costo de generación **sin tocar la calidad percibida** — porque para esas queries el modelo barato
-responde igual de bien.
+La diferencia de precio entre un modelo frontier y su variante barata del mismo proveedor es
+**20-30x** — una constante que se mantiene independientemente de qué generación de modelos estés
+mirando. Si el 70-80% de tus queries son "simples" (y en soporte lo son: FAQ, lookups,
+confirmaciones), rutear esas al modelo barato te ahorra el grueso del costo de generación
+**sin tocar la calidad percibida** — porque para esas queries el modelo barato responde igual de
+bien.
+
+El patrón 2026 más completo combina **benchmarking de calidad/latencia/costo** con el harness de
+M2 para decidir qué modelo entra en producción, y **distillation** como técnica complementaria:
+usás las salidas del modelo frontier para entrenar o few-shot el modelo barato, y transferís
+capacidad de forma controlada. (El fine-tuning de M9 cubre el mecanismo.)
 
 ### Cómo: clasificar la query, después rutear
 
@@ -86,9 +94,9 @@ menos a más sofisticada:
 1. **Heurísticas** (gratis, instantáneo): longitud de la query, presencia de palabras de
    comparación/razonamiento ("compará", "por qué", "conviene"), cantidad de entidades. Frágil pero
    sorprendentemente efectivo como primer corte.
-2. **Clasificador barato** (el patrón recomendado): un `gpt-4o-mini` con un prompt que devuelve
-   `simple | complex` en structured output. Cuesta centavos y es mucho más robusto que las
-   heurísticas. El meta-truco: usás el modelo *barato* para decidir si necesitás el *caro*.
+2. **Clasificador barato** (el patrón recomendado): el modelo barato del proveedor con un prompt
+   que devuelve `simple | complex` en structured output. Cuesta centavos y es mucho más robusto que
+   las heurísticas. El meta-truco: usás el modelo *barato* para decidir si necesitás el *caro*.
 3. **Clasificador ML propio** (M9): un clasificador entrenado (estilo Banking77, side-quest C) que
    rutea sin llamar a ningún LLM. Lo más barato y rápido en runtime, pero necesita datos y training.
 
@@ -106,14 +114,16 @@ const ROUTER_PROMPT = `Clasificá la consulta de soporte como "simple" o "comple
 - complex: comparación, razonamiento multi-paso, varias entidades, "por qué/conviene", troubleshooting.
 Respondé SOLO con el JSON {"complexity": "simple"|"complex"}.`;
 
+// Reemplazá con los IDs de modelo vigentes del proveedor que uses
+// (ej. modelo-barato = tier mini/haiku/flash; modelo-frontier = tier caro)
 const MODEL_BY_COMPLEXITY: Record<Complexity, string> = {
-  simple: 'gpt-4o-mini',
-  complex: 'gpt-4o',
+  simple: process.env.MODEL_CHEAP!,    // modelo barato del proveedor actual
+  complex: process.env.MODEL_FRONTIER!, // modelo frontier del proveedor actual
 };
 
 export async function routeQuery(query: string): Promise<Complexity> {
   const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini', // clasificás con el barato
+    model: process.env.MODEL_CHEAP!, // clasificás con el barato
     messages: [
       { role: 'system', content: ROUTER_PROMPT },
       { role: 'user', content: query },
@@ -146,7 +156,61 @@ decisión, tenés un recorte.
 
 ---
 
-## 3. Semantic caching
+## 3. Prompt caching del proveedor
+
+### Por qué es la palanca de menor fricción
+
+El prompt caching del proveedor (OpenAI y Anthropic lo implementan, cada uno a su manera) es la
+palanca de menor fricción del módulo: no requiere cambiar tu arquitectura ni agregar una tabla
+nueva. El proveedor cachea el **prefijo repetido de tu prompt** y te cobra ese prefijo a precio
+reducido en los llamadas sucesivas.
+
+El mecanismo concreto (OpenAI):
+
+- **Automático a partir de ≥1.024 tokens**: no necesitás activarlo. Si el prefijo del prompt
+  supera ese umbral, OpenAI detecta el cache automáticamente.
+- **Hits en incrementos de 128 tokens**: el cache trabaja con bloques de 128 tokens, no
+  token-por-token. Un prefijo de 2.000 tokens cacheado ahorra 15 bloques.
+- **Precio: ~50% del precio de input en cache hit**: si un token de input cuesta $X, un token
+  de cache hit cuesta ~$X/2.
+- **Extended caching hasta 24 horas**: el cache persiste el tiempo suficiente para workflows
+  de producción continuos.
+
+El layout correcto: **contenido estable al principio del prompt, variable al final**.
+
+```
+┌─────────────────────────────────────────────┐
+│  system prompt (instrucciones fijas)        │
+│  + documentación de dominio estática        │  ← ESTO se cachea (estable por días/semanas)
+│  + few-shot examples fijos                  │
+├─────────────────────────────────────────────┤
+│  chunks recuperados (variables por query)   │
+│  + historial de la conversación (variable)  │  ← ESTO no se cachea (cambia en cada llamada)
+│  + query del usuario                        │
+└─────────────────────────────────────────────┘
+```
+
+El error frecuente es poner los chunks recuperados *antes* de las instrucciones de sistema. Ese
+layout impide el caching: el prefijo variable invalida el cache en cada llamada.
+
+**Equipos en producción reportan 60–85% de reducción de costos** en pipelines donde el system
+prompt y los ejemplos few-shot son grandes y estables. En Grounded, donde la instrucción de
+sistema tiene varias páginas (política de la empresa, formato de respuesta, reglas de citas),
+el win es inmediato con cero código extra.
+
+Nota de diseño: esto es distinto del semantic cache que vas a construir en §4. El del proveedor
+cachea *tokens de prompt* dentro de una llamada; el tuyo cachea *respuestas completas* entre
+llamadas. Se complementan: el del proveedor baja el costo de los cache misses del semántico.
+
+> **Checkpoint:** ¿por qué estructurar el prompt "estable adelante, variable atrás" es una
+> decisión de arquitectura y no solo un detalle de formato? Porque cambia el perfil de costo
+> del sistema de forma permanente — un layout incorrecto descarta el 50% de descuento en cada
+> llamada, para siempre, sin que nadie te avise. El proveedor nunca falla; el layout que
+> invalida el cache sí.
+
+---
+
+## 4. Semantic caching
 
 ### Por qué un cache exact-match no alcanza
 
@@ -225,6 +289,8 @@ async def cache_store(db, tenant_id, query, embedding, response):
 
 ### Los tres peligros que tenés que defender
 
+
+
 El semantic caching es una cuchilla de doble filo. Si no entendés estos tres, no lo tenés dominado:
 
 1. **El umbral es un trade-off precision/recall.** Umbral *muy alto* (0.99) → casi nunca pega (poco
@@ -232,11 +298,11 @@ El semantic caching es una cuchilla de doble filo. Si no entendés estos tres, n
    pregunta que *parecía* igual pero no lo era → **respuesta incorrecta servida con confianza**. Lo
    tuneás midiendo: ¿cuántos hits son correctos a cada umbral? Empezás conservador (0.95+).
 
-2. **Aislamiento por tenant (no negociable).** El cache de Grounded es multi-tenant. La respuesta a
-   "¿cuál es nuestra política de reembolso?" del tenant A **no puede** servirse al tenant B — son
-   datos privados distintos. Por eso la tabla tiene `tenant_id` y *todo* lookup filtra por él. Esto
-   conecta directo con la regla cardinal de M4: el aislamiento es determinístico en la capa de DB,
-   nunca confiás en que el modelo "se acuerde" de no cruzar tenants.
+2. **Aislamiento por tenant (no negociable).** El cache de Grounded es multi-tenant. La respuesta
+   a "¿cuál es nuestra política de reembolso?" del tenant A **no puede** servirse al tenant B —
+   son datos privados distintos. Por eso la tabla tiene `tenant_id` y *todo* lookup filtra por él.
+   Esto conecta directo con la regla cardinal de M4: el aislamiento es determinístico en la capa
+   de DB, nunca confiás en que el modelo "se acuerde" de no cruzar tenants.
 
 3. **Invalidación.** Si el tenant sube un doc nuevo que cambia la respuesta correcta, el cache queda
    *stale* (sirve la respuesta vieja). La solución pragmática: TTL por entrada + invalidar las
@@ -250,7 +316,7 @@ El semantic caching es una cuchilla de doble filo. Si no entendés estos tres, n
 
 ---
 
-## 4. Token budgets y context budgets
+## 5. Token budgets y context budgets
 
 ### Por qué el desperdicio de context window es economía negativa
 
@@ -277,7 +343,7 @@ costo y dar una palanca de monetización (el plan caro tiene más context budget
 # services/api/budget.py
 import tiktoken
 
-enc = tiktoken.encoding_for_model("gpt-4o")
+enc = tiktoken.encoding_for_model("gpt-4o")  # o el modelo que uses — tiktoken cubre los modelos OpenAI
 
 def count_tokens(text: str) -> int:
     return len(enc.encode(text))
@@ -309,8 +375,8 @@ Tres prácticas más de budget que valen oro:
   del prompt (tu instrucción de sistema larga, que es idéntica en cada llamada) y lo cobran con
   descuento. Estructurá el prompt con lo estable adelante (system + instrucciones) y lo variable
   atrás (chunks + query) para maximizar el hit de ese cache. Esto es distinto del semantic cache de
-  §3: el del proveedor cachea *tokens de prompt* dentro de una llamada; el tuyo cachea *respuestas
-  enteras* entre llamadas.
+  §4: el del proveedor cachea *tokens de prompt* dentro de una llamada; el tuyo cachea *respuestas
+  enteras* entre llamadas. El detalle de cómo maximizar el hit está en §3.
 
 > **Checkpoint:** ¿meter más chunks "por las dudas" mejora o empeora? Empeora en los dos ejes:
 > sube el costo linealmente (pagás cada token, cada vez) y *baja* la calidad por *lost in the
@@ -319,16 +385,16 @@ Tres prácticas más de budget que valen oro:
 
 ---
 
-## 5. A/B testing de prompts y drift detection
+## 6. A/B testing de prompts y drift detection
 
 ### Por qué la calidad no es estática
 
 Pusiste el sistema en `recall@5 = 0.89` y respuestas que el judge de M2 aprueba. Tres meses después,
 sin que toques nada, la calidad bajó. ¿Por qué?
 
-- **El proveedor cambió el modelo por debajo.** "`gpt-4o`" es un alias que apunta a versiones que
-  rotan; un upgrade silencioso puede cambiar el comportamiento de tus prompts (a veces mejor, a veces
-  peor para *tu* caso particular).
+- **El proveedor cambió el modelo por debajo.** Los aliases de modelo (ej. `"gpt-4o"` o cualquier
+  alias sin versión fijada) apuntan a versiones que rotan; un upgrade silencioso puede cambiar el
+  comportamiento de tus prompts (a veces mejor, a veces peor para *tu* caso particular).
 - **Cambió la distribución de queries.** Tus clientes empezaron a preguntar sobre una feature nueva
   que tu doc no cubre bien. El sistema no cambió; el mundo sí.
 - **Tocaste un prompt** "para mejorar algo" y rompiste otra cosa sin medirlo.
@@ -357,14 +423,14 @@ trace de §6), y comparás métricas. Solo promovés B a 100% si gana en el harn
 online. Es la misma lógica del rerank de M3 ("lo mantengo solo si el número sube"), aplicada a
 prompts en producción.
 
-> **Checkpoint:** ¿por qué el A/B de prompts necesita la observabilidad de §6 para funcionar? Porque
+> **Checkpoint:** ¿por qué el A/B de prompts necesita la observabilidad de §7 para funcionar? Porque
 > para comparar A vs B tenés que poder **atribuir** cada respuesta, cada costo y cada métrica a su
 > variante. Sin un `prompt_version` etiquetado en cada trace, tu A/B es "me parece que el nuevo
 > anda mejor" — vibes, no medición.
 
 ---
 
-## 6. Observabilidad: ver el costo y la latencia (Langfuse)
+## 7. Observabilidad: ver el costo y la latencia (Langfuse)
 
 ### Por qué no podés optimizar lo que no ves
 
@@ -405,7 +471,7 @@ from langfuse import observe
 async def answer(query: str, tenant_id: int, prompt_version: str):
     # el wrapper captura model, tokens, costo y latencia de cada llamada solo
     res = await openai.chat.completions.create(
-        model="gpt-4o-mini",
+        model=os.environ["MODEL_CHEAP"],  # el modelo vigente del proveedor que uses
         messages=[...],
         metadata={"tenant_id": tenant_id, "prompt_version": prompt_version},  # para A/B y costo por tenant
     )
@@ -423,7 +489,7 @@ final: es el instrumento que hace medibles a las otras cuatro palancas.**
 
 ---
 
-## 7. ⊕ Graft open-source: swap a Ollama (Llama 3.1 / Mistral)
+## 8. ⊕ Graft open-source: swap a Ollama (Llama 3.1 / Mistral)
 
 ### Por qué hacer este graft
 
@@ -473,11 +539,11 @@ SDK propietario, sería un refactor.
 El graft no es "corrí Llama". Es **medir el trade-off de tres ejes** con *tu* harness y *tu* dataset,
 y poder defenderlo:
 
-| | gpt-4o-mini (API) | Llama 3.1 8B (Ollama, local) |
+| | Modelo barato del proveedor (API) | Llama 3.1 8B (Ollama, local) |
 |---|---|---|
-| **Costo** | ~$0.15-0.60 / 1M tok | $0 marginal por token, pero **pagás el GPU/hora** (amortizable solo con volumen) |
+| **Costo** | precio del tier barato del proveedor (varía por generación) | $0 marginal por token, pero **pagás el GPU/hora** (amortizable solo con volumen) |
 | **Calidad** (golden set de M2) | tu número, ej. 0.89 | tu número, ej. 0.81 — **medilo, no lo asumas** |
-| **Latencia / TTFT** | rápido si OpenAI no está saturado; depende de la red | depende **brutalmente** de tu hardware (sin GPU decente, lento; con GPU, competitivo) |
+| **Latencia / TTFT** | rápido si el proveedor no está saturado; depende de la red | depende **brutalmente** de tu hardware (sin GPU decente, lento; con GPU, competitivo) |
 | **Privacidad** | datos salen a un tercero | datos **no salen** de tu infra |
 | **Operación** | cero infra, pero rate limits del proveedor | vos operás el modelo (GPU, escala, uptime) |
 
@@ -520,7 +586,7 @@ tamaño/calidad/velocidad y por qué INT4/GGUF es lo que hace que Ollama corra e
 
 ---
 
-## 8. Escala: ¿async simple o BullMQ + Celery?
+## 9. Escala: ¿async simple o BullMQ + Celery?
 
 Hasta acá la ingestión de Grounded usó **async Python simple** (M0/M1). M7 es el punto donde te
 preguntás si necesitás colas de trabajo robustas (**BullMQ** en TS, **Celery** en Python). La
@@ -540,19 +606,22 @@ con un síntoma medido*, vale más que la cola en sí.
 
 ---
 
-## 9. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
+## 10. Lo que tenés que poder defender (conecta con `criterios-defensa.md`)
 
 Al cerrar M7, un entrevistador podría pegarte cualquiera de estas. Si no las respondés con *tus
 números* y *tus decisiones*, el módulo no está cerrado:
 
-- "Tenés 1M de queries/día. Optimizá el costo." (Las 4 palancas, §1-§4, en orden de impacto.)
-- "¿Cómo cacheás respuestas de un LLM si nunca preguntan exactamente lo mismo?" (§3, semantic cache.)
+- "Tenés 1M de queries/día. Optimizá el costo." (Las palancas — prompt caching, routing, semantic
+  cache, budgets — §1-§5, en orden de impacto.)
+- "¿Qué es prompt caching del proveedor y cómo lo maximizás?" (§3: automático ≥1.024 tokens, 50%
+  de descuento en cache hit, layout estable-primero.)
+- "¿Cómo cacheás respuestas de un LLM si nunca preguntan exactamente lo mismo?" (§4, semantic cache.)
 - "¿Cuándo mandás una query al modelo barato vs al caro, y cómo decidís?" (§2, routing + el harness.)
-- "Metiste 20 chunks para mejorar la respuesta. ¿Bien o mal?" (§4, budget + lost in the middle.)
+- "Metiste 20 chunks para mejorar la respuesta. ¿Bien o mal?" (§5, budget + lost in the middle.)
 - "¿Cómo sabés que la calidad no se degradó cuando cambiaste de prompt / el proveedor cambió el
-  modelo?" (§5, drift + harness continuo.)
-- "¿Qué es TTFT y por qué te importa más que la latencia total en un chat?" (§6.)
-- "¿Cuándo usarías un modelo open-source self-hosted en vez de la API de OpenAI?" (§7, la tabla.)
+  modelo?" (§6, drift + harness continuo.)
+- "¿Qué es TTFT y por qué te importa más que la latencia total en un chat?" (§7.)
+- "¿Cuándo usarías un modelo open-source self-hosted en vez de la API de un proveedor?" (§8, la tabla.)
 - "¿Qué es quantization y cómo corrés un 8B en una laptop?" (sidebar, INT4/GGUF.)
 
 Seguí con `material-apoyo.md` para las fuentes, y después `practica.md` para construir las palancas

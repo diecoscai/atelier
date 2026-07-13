@@ -5,7 +5,8 @@ import type { GateStatus, ModuleProgress, ProgressMap } from "./types";
 // Uses a standard Redis (Railway) via REDIS_URL when configured; falls back to
 // an in-memory store for local dev so the hub runs without Redis. Called ONLY
 // from API routes.
-const REDIS_URL = process.env.REDIS_URL;
+// KV_URL es el nombre que inyecta la integración Upstash de Vercel Marketplace
+const REDIS_URL = process.env.REDIS_URL ?? process.env.KV_URL;
 const KEY = "atelier:progress";
 
 const memStore: { value: ProgressMap } = { value: {} };

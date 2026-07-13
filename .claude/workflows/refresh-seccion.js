@@ -173,4 +173,5 @@ for (let round = 1; round <= 3; round++) {
     : 'El verificador falló; revisa integridad general de la sección.'
   log(`${SLUG}: score ${verdict ? verdict.score : '?'}/10 en ronda ${round}, iterando con feedback`)
 }
+log(`${SLUG}: quedó <8 tras 3 rondas — los archivos editados quedan SIN commitear; revisa los issues o descarta con git checkout`)
 return { slug: SLUG, score: verdict ? verdict.score : 0, rounds: 3, needsAttention: true, issues: verdict ? verdict.issues : [] }

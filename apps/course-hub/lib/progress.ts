@@ -2,7 +2,7 @@ import type Redis from "ioredis";
 import type { GateStatus, ModuleProgress, ProgressMap } from "./types";
 
 // Single boundary to the mutable learner state (gates, drill verdicts).
-// Uses a standard Redis (Railway) via REDIS_URL when configured; falls back to
+// Uses a standard Redis (Upstash) via REDIS_URL/KV_URL when configured; falls back to
 // an in-memory store for local dev so the hub runs without Redis. Called ONLY
 // from API routes.
 // KV_URL es el nombre que inyecta la integración Upstash de Vercel Marketplace

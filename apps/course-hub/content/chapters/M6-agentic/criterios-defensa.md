@@ -29,6 +29,11 @@ Al terminar M6 tenés que poder, en el nivel honesto indicado:
   M3 y la generación con citations de M4.
 - **(can-explain)** El patrón **ReAct** (Thought → Action → Observation) y por qué acoplar
   reasoning y acting es mejor que cualquiera por separado.
+- **(can-defend)** **¿Cuándo usarías Mem0 (o LangMem/Letta/Zep) en vez del checkpointer de
+  LangGraph?** El checkpointer alcanza para memoria intra-sesión de un solo agente; un memory
+  service externo gana cuando necesitás memoria **cross-session o cross-agent** con TTL propio y
+  su propia estrategia de retrieval/consolidación. Nombrá también el patrón en capas (working /
+  episodic / semantic / procedural).
 - **(can-defend)** **Multi-agent:** por qué 2 agentes (retriever + answer) — el beneficio concreto
   (evaluabilidad + enfoque separados) — y **cuándo es sobre-ingeniería** (más cajas sin beneficio
   nombrable).

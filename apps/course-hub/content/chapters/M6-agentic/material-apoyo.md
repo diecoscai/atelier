@@ -52,6 +52,13 @@ mejor en system design (sobre todo reasoning-RAG y agent-eval, que son las pregu
 - **LangGraph — multi-agent / supervisor** — en las docs de langchain-ai, la sección de
   *multi-agent systems* (supervisor pattern). Para el graft de los 2 agentes (retriever + answer).
   Buscá cómo se pasa state entre subgrafos.
+- **Mem0 — "State of AI Agent Memory 2026"** `mem0.ai/blog/state-of-ai-agent-memory-2026`. El
+  mapa de mercado citado en la Sección 6b: ~41K stars, ~186M API calls en Q3-2025, y dónde se
+  ubican LangMem, Letta y Zep respecto a Mem0. Buscá también el vocabulario de memoria en capas
+  (working / episodic / semantic / procedural).
+- **LangMem — docs oficiales** `langchain-ai.github.io/langmem/`. La extensión de LangGraph para
+  memoria cross-session (Sección 6b). Buscá cómo se integra con el `StateGraph` que ya usás y qué
+  agrega sobre el checkpointer nativo.
 - **LangGraph — agentic RAG tutorial** (notebook `langgraph_agentic_rag` / `langgraph_self_rag`).
   El ejemplo canónico de `agent → retrieve → grade → generate` con `tools_condition` y
   `add_conditional_edges`. Tu grafo de la práctica es una variante de este.

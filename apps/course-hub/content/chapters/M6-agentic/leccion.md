@@ -456,6 +456,54 @@ reemplaza nada de lo anterior: lo **orquesta**.
 
 ---
 
+## 6b. Memoria de agentes: más allá del checkpointer (awareness)
+
+El bullet "Checkpointing / memoria" de la Sección 6 te alcanza para memoria **intra-sesión, de un
+solo agente**: el estado persiste entre turnos de la misma conversación. El ecosistema 2026 tiene
+un mercado entero de **memory-as-a-service** para el caso que ese checkpointer no resuelve:
+memoria que sobrevive entre sesiones y entre agentes distintos.
+
+**El mapa del mercado (vocabulario de entrevista para roles agénticos):**
+- **Mem0** — el líder de facto: ~41K stars en GitHub y ~186M llamadas a su API en el Q3-2025.
+  Memoria vectorial + de grafo con extracción y consolidación automática de los hechos relevantes
+  de la conversación.
+- **LangMem** — la extensión de LangChain/LangGraph para memoria long-term; se integra con el
+  mismo `StateGraph` que ya usás en la Sección 6, pero agrega storage cross-thread que el
+  checkpointer nativo no da.
+- **Letta** (ex-MemGPT) — el framework que originó la idea de "memoria como sistema operativo":
+  paginación entre memoria "core" (siempre en contexto) y "archival" (recuperada on-demand).
+- **Zep** — memoria temporal sobre un grafo de conocimiento (temporal knowledge graph), fuerte en
+  resumir e indexar historial conversacional largo con noción de recencia.
+
+**El patrón de memoria en capas** (vas a verlo citado en casi cualquier entrevista de rol
+agéntico 2026):
+- **Working memory** — el contexto de la tarea actual, lo que vive en la ventana ahora mismo. Es
+  tu `AgentState` de la Sección 6.
+- **Episodic memory** — recuerdos de eventos concretos pasados ("el cliente X preguntó Y la
+  semana pasada"). Requiere persistencia cross-session.
+- **Semantic memory** — hechos consolidados con el tiempo ("el cliente X está en el plan
+  Enterprise"), no un log crudo de interacciones.
+- **Procedural memory** — cómo hacer algo (skills, procedimientos aprendidos). Es la capa menos
+  madura en los productos actuales.
+
+**Cuándo alcanza el checkpointer y cuándo conviene un memory service externo:**
+- **Single-session, single-agent** (tu grafo de la Sección 6, una conversación de soporte de
+  punta a punta) → el checkpointer de LangGraph alcanza. Es memoria simple, tipada, versionada
+  con tu propio código.
+- **Cross-session** (el cliente vuelve tres días después y el agente "recuerda" el ticket
+  anterior) o **cross-agent** (el retriever agent y el answer agent de la Sección 7 comparten
+  memoria de largo plazo, no solo el state de un run) → ahí un memory service externo (Mem0,
+  LangMem, Zep) gana: te da TTL por entrada, su propia estrategia de retrieval/consolidación, y
+  no reinventás la extracción de "qué vale la pena recordar".
+
+> **Lo que defendés:** "Uso el checkpointer de LangGraph para memoria intra-sesión porque es lo
+> más simple que resuelve el problema — no agrego un memory service externo sin necesidad
+> medida. Si el producto necesitara memoria cross-session o cross-agent con su propia política de
+> expiración, ahí evaluaría Mem0 o LangMem, no antes." Es la misma disciplina de "empezá simple"
+> de la Sección 5.
+
+---
+
 ## 7. Multi-agent: dos agentes, y por qué (casi nunca)
 
 El graft de M6 es construir **dos agentes** LangGraph: un **retriever agent** (su trabajo: juntar
@@ -743,6 +791,28 @@ de tracing del SDK vos mismo.
 curso. Lo que sí tenés que poder defender: "conozco las alternativas, en qué se diferencian, y
 por qué elegí LangGraph para este caso". Awareness sin hype: las tres son herramientas válidas
 para distintos contextos. El criterio de selección importa más que la herramienta.
+
+### Mapa de protocolos 2026: MCP (las manos) vs A2A (el handshake)
+
+Un protocolo aparte que conviene ubicar en el mapa: **A2A** (Agent2Agent), donado a la Linux
+Foundation y con **150+ organizaciones** ya sumadas al año de su lanzamiento (hito de abril de
+2026). No compite con MCP —
+resuelve un problema distinto:
+
+- **MCP** (Model Context Protocol) estandariza cómo **un agente usa herramientas**: llama una
+  tool (una API, una base de datos, un archivo) a través de un servidor MCP. Es "las manos" del
+  agente.
+- **A2A** estandariza cómo **dos agentes de vendors distintos se coordinan entre sí**:
+  descubrimiento de capacidades, delegación de tareas, intercambio de resultados, sin que ninguno
+  conozca la implementación interna del otro. Es "el handshake" entre agentes.
+
+Son capas **complementarias, no alternativas**: un agente puede usar MCP para sus tools y A2A
+para hablar con un agente de otra organización. Para el vertical de Grounded — un agente de
+soporte single-tenant que controlás de punta a punta (retriever + answerer, Sección 7) — **MCP
+alcanza**; no hay otro vendor con el que negociar un handshake. A2A es **awareness para
+entrevistas de integración multi-agente cross-org** (ej. tu agente de soporte coordinándose con
+el agente de facturación de otra empresa): sabé nombrarlo y explicar qué resuelve — no hace falta
+implementarlo en este módulo.
 
 ## 10c. Sidebar — El patrón LLM Wiki de Karpathy (memoria navegable)
 

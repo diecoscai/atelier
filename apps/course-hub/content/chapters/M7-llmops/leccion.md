@@ -482,6 +482,14 @@ LLM → stream) y la API de OpenAI no te dice "esta conversación costó $0.03 y
 primer token". Necesitás una capa de **tracing específica para LLMs** que capture eso. La estándar
 open-source es **Langfuse** (que ya introdujiste en M2 para evals — acá la usás para costo/latencia).
 
+**Nota de currency:** Langfuse no es una capa propietaria aislada — en 2026 corre **sobre
+OpenTelemetry (OTel)**, el protocolo estándar de la industria para traces/spans (el SDK v4 que
+usás más abajo exporta spans OTel). Vale la pena decirlo así en una entrevista o en tu propia
+doc: "instrumentamos con Langfuse sobre OTel", no solo "usamos Langfuse". Un listing que pide
+"observabilidad"/"observability" sin nombrar un vendor suele estar buscando el keyword OTel —
+decir solo "Langfuse" es un keyword-miss evitable en un filtro de ATS o en la primera pasada de
+un entrevistador.
+
 ### Las métricas que importan (y qué es cada una, exacto)
 
 - **TTFT (time-to-first-token):** el tiempo desde que mandás el request hasta que llega el **primer

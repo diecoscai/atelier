@@ -78,6 +78,11 @@ referencia para consultar mientras construís, o profundización opcional. Para 
   prompt caching más arriba.
 - **llama.cpp** `github.com/ggml-org/llama.cpp` — el motor detrás de Ollama; el repo donde vive el
   formato **GGUF** y la doc de los esquemas de cuantización (`Q4_K_M`, etc.).
+- **OpenTelemetry** `opentelemetry.io` — el protocolo de traces/spans sobre el que corre Langfuse
+  en 2026 (ver §7 de la lección). No hace falta implementarlo aparte de Langfuse; alcanza con
+  poder nombrarlo cuando describís tu stack de observabilidad. Complementa la doc de Langfuse de
+  arriba: `langfuse.com/docs` tiene la sección de integración con OTel si querés el detalle de
+  cómo se relacionan los dos.
 
 ## Deep dive (opcional, para defender mejor en system design)
 

@@ -33,10 +33,10 @@ da por sentado.
 
 ## 1. El problema: clasificación de intents
 
-**Banking77** es un dataset real (PolyAI) de 13.000+ frases de clientes de banca etiquetadas en
-**77 intents** (`card_arrival`, `lost_or_stolen_card`, `exchange_rate`, ...). La tarea: dada una
-frase nueva, predecir el intent. Es clasificación **multi-clase** y bastante difícil (77 clases,
-varias muy parecidas entre sí).
+**Banking77** es un dataset real (PolyAI) de **13,083 frases** de clientes de banca (10,003 train
++ 3,080 test) etiquetadas en **77 intents** (`card_arrival`, `lost_or_stolen_card`,
+`exchange_rate`, ...). La tarea: dada una frase nueva, predecir el intent. Es clasificación
+**multi-clase** y bastante difícil (77 clases, varias muy parecidas entre sí).
 
 Esto es el patrón exacto de un **router**: clasificar rápido y barato la intención del usuario
 para decidir qué hacer. En Grounded (M9), un intent claro y barato puede resolverse sin LLM.

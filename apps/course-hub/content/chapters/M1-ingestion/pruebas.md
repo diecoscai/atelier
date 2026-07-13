@@ -26,7 +26,9 @@ El chunker y el parser son funciones (casi) puras → testealos con `pytest`. As
       filas de páginas reales tienen `page` no-NULL; el chunk de tabla tiene `element_type =
       'table'`.
 - [ ] **Embed async no pierde chunks.** `len(embed_all(chunks)) == len(chunks)` y todos los
-      embeddings tienen dim 1536 (ningún chunk quedó sin embeber por el límite de concurrencia).
+      embeddings tienen la dimensión esperada de tu modelo (1536 si usás
+      `text-embedding-3-small`; verificá contra la tuya si usás otro proveedor) — ningún chunk
+      quedó sin embeber por el límite de concurrencia.
 - [ ] **Multimodal end-to-end.** Ingerir el screenshot fixture crea ≥1 chunk con
       `element_type == 'image_caption'`; una query conocida sobre su contenido recupera ese chunk
       en el top-k.

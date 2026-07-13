@@ -21,8 +21,9 @@ Al terminar M6 tenés que poder, en el nivel honesto indicado:
 ## Harness y multi-agent
 
 - **(can-defend)** **Harness engineering**: qué es el harness (scaffolding, guardrails, logging,
-  handoff), por qué "agents aren't hard; the Harness is hard" (swyx, jun-2026), y qué piezas de
-  tu implementación son harness vs agente.
+  handoff), por qué "agents aren't hard; the Harness is hard" (frase muy citada en 2026,
+  rastreada a Ryan Lopopolo del equipo Codex de OpenAI — no a swyx, pese a la atribución errónea
+  que circuló), y qué piezas de tu implementación son harness vs agente.
 - **(can-build)** Un grafo LangGraph con **routing** (`add_conditional_edges`) y un **loop
   multi-hop** con corte duro (`MAX_HOPS`), sobre un `AgentState` tipado, reusando el retrieval de
   M3 y la generación con citations de M4.
@@ -61,8 +62,10 @@ Al terminar M6 tenés que poder, en el nivel honesto indicado:
   (handoffs, guardrails, sessions, tracing built-in). Diferencias clave y criterio de selección.
   No hace falta implementarlos — hace falta poder explicar cuándo usarías cada uno.
 - **(awareness + can-defend)** **Reasoning-RAG:** System 1 (pipeline fijo) vs System 2
-  (reasoning-driven retrieval); por qué o3 / extended thinking / Gemini 2.5 ganan poco o degradan
-  con RAG document-level estándar; y **cómo adaptarías** el pipeline (retrieval-as-tool, recuperar
-  más grueso, rutear por modelo) — logueado como entry en `DECISIONS.md`.
+  (reasoning-driven retrieval); que "reasoning models" ya no es una categoría de modelo separada
+  sino razonamiento adaptativo integrado a los flagship (parámetro `effort` en Claude); por qué
+  esos modelos ganan poco o degradan con RAG document-level estándar; y **cómo adaptarías** el
+  pipeline (retrieval-as-tool, recuperar más grueso, rutear el nivel de esfuerzo por query) —
+  logueado como entry en `DECISIONS.md`.
 - **(awareness)** **LLM Wiki** (Karpathy, may-2026): memoria navegable en markdown vs embedding
   search — cuándo cada uno y sus trade-offs.

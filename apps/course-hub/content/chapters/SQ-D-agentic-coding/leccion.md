@@ -14,7 +14,7 @@ when: M0 → M11 (se practica en cada módulo, no bloquea)
 > verificación como palanca de calidad, subagentes especializados, hooks deterministas, y cómo
 > defender cada decisión en una ronda de entrevista AI-assisted. Esto no es teoría: es la
 > práctica que el mercado ya evalúa explícitamente en hiring (Canva jun-2025, piloto Google
-> Q2-2026).
+> anunciado Q2-2026 con rollout en H2-2026).
 
 ---
 
@@ -45,22 +45,28 @@ delegar, cómo verificar, y cuándo rechazar.
 
 El dato de Karpathy lo ilustra con una cronología personal: en noviembre de 2025 seguía
 escribiendo ~80% del código él mismo. En diciembre de 2025 hubo una inflexión: empezó a delegar
-~80% a agentes. En febrero de 2026, en el evento Sequoia Ascent, documentó el cambio de
-posición: el vibe coding (escribir código sin mirar demasiado) es el pasado; lo que viene es
+~80% a agentes. A fines de abril de 2026, en el evento Sequoia AI Ascent, documentó el cambio
+de posición: el vibe coding (escribir código sin mirar demasiado) es el pasado; lo que viene es
 agentic engineering — con quality gates, oversight, y spec writing. La cita: *"Vibe coding
-raises the floor. Agentic engineering is about extrapolating the ceiling."*
+raises the floor. Agentic engineering is about extrapolating the ceiling."* (Karpathy se unió
+a Anthropic en mayo de 2026 para liderar research de pre-entrenamiento de Claude — vale
+aclararlo si te preguntan qué tan "externa" es esta fuente.)
 
 La misma transición la describe desde el lado de herramientas: Boris Cherny (autor de Claude
-Code) publica en enero 2026 sus 107 tips de uso real, corriendo 5 instancias de Claude Code en
-paralelo (5 checkouts) más 5-10 sesiones en claude.ai/code. El tip #1 es consistente con lo
-que documenta en las best practices oficiales: darle al agente una forma de verificar su propio
-output es la palanca más grande de calidad.
+Code) publica desde enero 2026 una lista viva de tips de uso real — arrancó con 107, hoy
+(jul-2026) son 118+ — corriendo 5 instancias de Claude Code en paralelo (5 checkouts) más 5-10
+sesiones en claude.ai/code. El tip #1 es consistente con lo que documenta en las best practices
+oficiales: darle al agente una forma de verificar su propio output es la palanca más grande de
+calidad.
 
-En el mercado: Canva desde junio 2025 espera que los candidatos usen Copilot, Cursor o Claude
-en las rondas de coding. Google piloteó una ronda con Gemini en Q2-2026. Lo que evalúan no es
-si usás la herramienta — es si sabés usar la herramienta con estrategia: validar el output,
-debuggear outputs multi-step, ensamblar contexto. No aceptar el output crudo es un criterio
-explícito.
+En el mercado: Canva, desde el 11 de junio de 2025, espera que los candidatos usen Copilot,
+Cursor o Claude en las rondas de coding, compartiendo pantalla. Google anunció en Q2-2026 (mayo)
+un piloto que reemplaza la ronda de "Googleyness and Leadership" por una conversación de diseño
+técnico basada en el trabajo previo del candidato, con Gemini como asistente obligatorio; el
+rollout arranca en equipos selectos (Cloud, Platforms & Devices) en H2-2026, sin fecha pública
+de expansión al resto de la compañía. Lo que evalúan no es si usás la herramienta — es si sabés usar la herramienta con estrategia:
+validar el output, debuggear outputs multi-step, ensamblar contexto. No aceptar el output crudo
+es un criterio explícito.
 
 ---
 
@@ -82,8 +88,11 @@ Las prácticas documentadas:
   lo que se resuelve mejor con un slash command o una instrucción en el prompt de esa sesión.
 
 El análogo en el ecosistema OpenAI es AGENTS.md — mismo concepto, misma función, distinto
-nombre. Codex (que corre sobre GPT-5.5) lo usa como punto de entrada para entender el repo
-antes de ejecutar cualquier tarea.
+nombre. Codex lo usa como punto de entrada para entender el repo antes de ejecutar cualquier
+tarea. El modelo que corre detrás de Codex cambia rápido — de GPT-5.4 (mar-2026) a GPT-5.5
+(abr-2026) a la familia GPT-5.6 "Sol/Terra/Luna" (GA 9-jul-2026), un modelo nuevo cada ~2 meses
+— así que conviene entender el patrón (AGENTS.md como contrato) en vez de memorizar qué modelo
+corre por debajo en un momento dado.
 
 ---
 
@@ -110,10 +119,13 @@ PR).
 
 ## 4. Verificación — la palanca de calidad 2-3x
 
-La cita de Cherny en las best practices oficiales de Anthropic: *"Giving Claude a way to verify
-its work is probably the most important thing to get great results."* En los 107 tips de enero
-2026, el tip #1 es exactamente eso: el agente que puede verificar itera hasta que el resultado
-es excelente.
+La cita original de Cherny (post de ingeniería, 2025): *"Giving Claude a way to verify its work
+is probably the most important thing to get great results."* La página oficial de best
+practices, reescrita en 2026, lo dice hoy así: *"Give Claude a check it can run: tests, a
+build, a screenshot to compare. It's the difference between a session you watch and one you
+walk away from."* Mismo principio, versión más operacional — y la que vas a encontrar si buscás
+la fuente hoy. En la lista de tips de Cherny, el tip #1 es exactamente eso: el agente que puede
+verificar itera hasta que el resultado es excelente.
 
 Qué cuenta como verificación:
 
@@ -154,6 +166,11 @@ duplican trabajo o dejan gaps.
 El comando: `"use subagents"` al final de cualquier request le indica a Claude Code que use
 más compute lanzando subagentes para esa tarea. El contexto principal queda limpio.
 
+La guía oficial actual también describe **agent teams**: coordinación automática entre varias
+sesiones, un paso más allá de correr instancias en paralelo manualmente (que es lo que hace
+Cherny con sus 5 checkouts). Es la evolución natural del mismo principio — subagentes
+especializados, pero orquestados por el propio Claude Code en vez de a mano.
+
 ---
 
 ## 6. Slash commands — packaging de expertise
@@ -177,15 +194,21 @@ La distinción que hace Cherny es limpia: lo que DEBE pasar siempre (lint, forma
 tests) no va en el prompt — va en un hook. Los prompts se pueden ignorar, malinterpretar, o
 quedar desactualizados. Los hooks son deterministas.
 
-PostToolUse es el hook más útil: se dispara cada vez que el agente escribe o ejecuta algo, y
-puede correr verificaciones o transformaciones automáticas sobre el resultado. Un hook de lint
-que corre después de cada write garantiza que el código queda bien formateado sin que el agente
-tenga que recordarlo.
+PostToolUse es el hook más útil para checks por-acción: se dispara cada vez que el agente
+escribe o ejecuta algo, y puede correr verificaciones o transformaciones automáticas sobre el
+resultado. Un hook de lint que corre después de cada write garantiza que el código queda bien
+formateado sin que el agente tenga que recordarlo.
+
+La guía actual también documenta el **Stop hook**: se dispara cuando el agente considera que
+terminó la tarea, y es el mecanismo recomendado hoy para el check de cierre (correr tests o
+build completos antes de dar el trabajo por hecho) — complementa a PostToolUse en vez de
+reemplazarlo. PostToolUse para checks deterministas por cada write (lint, format); Stop hook
+para el check de cierre de la tarea completa.
 
 La diferencia con una instrucción en CLAUDE.md: si "siempre corrés `ruff format` antes de
 commitear" está en CLAUDE.md, el agente puede olvidarlo, saltárselo cuando está apresurado, o
-interpretarlo de forma distinta en un contexto nuevo. Si está en un PostToolUse hook, corre
-siempre, independientemente del estado del agente.
+interpretarlo de forma distinta en un contexto nuevo. Si está en un hook (PostToolUse o Stop),
+corre siempre, independientemente del estado del agente.
 
 ---
 
@@ -196,6 +219,14 @@ diferencia: skip-permissions deshabilita todas las verificaciones; permissions e
 declaran exactamente qué puede tocar el agente. Es una decisión de seguridad y de documentación
 del sistema.
 
+La guía actual agrega una tercera opción intermedia: **auto mode**, un clasificador que aprueba
+automáticamente acciones de bajo riesgo. Sirve cuando aprobar cada write a mano es demasiado
+fricción pero deshabilitar todas las verificaciones (`--dangerously-skip-permissions`) es
+demasiado riesgo. Anthropic publicó la calibración del clasificador: 0.4% de falsos positivos y
+17% de falsos negativos sobre un set de prueba de acciones "overeager", frente al 100% de falsos
+negativos de `--dangerously-skip-permissions` (que, por definición, no evalúa nada). Auto mode
+es más seguro que skip-permissions — no es riesgo cero.
+
 Para paralelismo con aislamiento, Cherny usa **git worktrees**: cada instancia de Claude Code
 trabaja en su propio checkout del repo. Así varios agentes pueden trabajar en paralelo sobre
 el mismo codebase sin pisarse los archivos. Cuando la tarea termina, el worktree se mergea o
@@ -204,8 +235,11 @@ descarta.
 El patrón Anthropic para tareas long-running (documentado en el Agent SDK): harness de dos
 agentes con initializer + worker. El initializer establece el estado y los artefactos de
 handoff (progress file + git history). El worker toma eso y continúa. Rakuten corrió una
-feature compleja en un codebase de 12.5M líneas con un run autónomo de 7 horas usando este
-patrón.
+feature compleja (extracción de activation vectors en vLLM, con 99.9% de precisión numérica) con
+un run autónomo de 7 horas usando este patrón, en lo que Anthropic reporta oficialmente como un
+codebase de 12.5M líneas — análisis técnicos independientes calculan que vLLM completo ronda las
+600k líneas, unas 20 veces menos. El resultado y la duración del run son reales; la escala del
+codebase, no tanto. Vale citar el caso con esa salvedad si te piden defenderlo en una entrevista.
 
 ---
 

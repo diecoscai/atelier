@@ -4,6 +4,8 @@ module: M4
 
 # Material de apoyo — M4
 
+> Enlaces y versiones verificados en julio 2026.
+
 Curado y ordenado. Los **★ Core** son obligatorios antes de la práctica; **Referencia** es para
 consultar mientras construís; **Deep** es profundización opcional para defender mejor en system
 design. No leas todo de corrido — leé Core, construí, y volvé a Referencia cuando lo necesites.
@@ -11,22 +13,30 @@ design. No leas todo de corrido — leé Core, construí, y volvé a Referencia 
 ## ★ Core (leé esto antes de tocar código)
 
 1. **Instructor — documentación oficial**
-   `python.useinstructor.com` · repo `github.com/567-labs/instructor`
-   *La* herramienta para structured outputs con Pydantic. Buscá: el "Getting Started" (patrón
-   `from_openai` + `response_model`), `max_retries` y cómo Instructor re-pregunta con el error de
+   `python.useinstructor.com` · repo `github.com/567-labs/instructor` (11k+ ⭐, versión estable
+   `1.15.4`, PyPI `pypi.org/project/instructor`)
+   *La* herramienta para structured outputs con Pydantic. Buscá: el "Getting Started" con el patrón
+   **actual** `instructor.from_provider("openai/gpt-4o-mini")` (interfaz unificada para 15+
+   providers — OpenAI, Anthropic, Gemini, Ollama, etc.; el viejo `from_openai` sigue funcionando
+   pero ya no es el ejemplo canónico), `max_retries` y cómo Instructor re-pregunta con el error de
    validación, y los ejemplos de "Validation". Después buscá el ejemplo de **Citations / RAG** (hay
-   un recipe específico de validar que la cita es un substring del contexto). ~45 min.
+   un recipe específico de validar que la cita es un substring del contexto). Instalá pineando
+   versión (`uv add "instructor==1.15.4"`), no a ciegas. ~45 min.
 
 2. **OpenAI — Structured Outputs guide**
-   `platform.openai.com/docs/guides/structured-outputs`
-   La doc oficial del constrained decoding. Buscá: la diferencia entre **JSON mode** y **Structured
-   Outputs** (`strict: true`), qué garantiza cada uno, y las limitaciones del schema (qué subset de
-   JSON Schema soporta). Es lo que respalda la tabla de la §2 de la lección. ~30 min.
+   `developers.openai.com/api/docs/guides/structured-outputs`
+   La doc oficial del constrained decoding. Buscá: la diferencia entre **JSON mode** (que la propia
+   doc marca como *legacy*) y **Structured Outputs** (`strict: true`), qué garantiza cada uno, y las
+   limitaciones del schema (qué subset de JSON Schema soporta). Es lo que respalda la tabla de la
+   §2 de la lección. De paso, revisá `developers.openai.com/api/docs/deprecations` para ver qué
+   snapshots de modelo tienen fecha de shutdown ya anunciada — relevante para fijar el modelo del
+   código de ejemplo. ~30 min.
 
 3. **OpenAI — Logprobs (guía + cookbook)**
-   Doc: `platform.openai.com/docs/api-reference/chat` (parámetros `logprobs` / `top_logprobs`).
-   Cookbook: OpenAI Cookbook, notebook **"Using logprobs"** (`cookbook.openai.com`, buscá
-   "logprobs"). Buscá: cómo pedir logprobs, cómo leer `top_logprobs`, y los **casos de uso de
+   Doc: `developers.openai.com/api/docs/api-reference/chat` (parámetros `logprobs` / `top_logprobs`,
+   sección Chat Completions — la Responses API no soporta logprobs a julio 2026).
+   Cookbook: OpenAI Cookbook, notebook **"Using logprobs"** (`cookbook.openai.com/examples/using_logprobs`).
+   Buscá: cómo pedir logprobs, cómo leer `top_logprobs`, y los **casos de uso de
    confianza/clasificación** — el cookbook muestra exactamente cómo convertir logprobs en una señal
    de confianza, que es lo que instrumentás en Grounded. ~40 min.
 
@@ -43,7 +53,10 @@ design. No leas todo de corrido — leé Core, construí, y volvé a Referencia 
      (DB compartida + filtro por `tenant_id`).
    - **Postgres Row-Level Security** — doc oficial `postgresql.org/docs/current/ddl-rowsecurity.html`.
      Buscá: `ENABLE ROW LEVEL SECURITY`, `CREATE POLICY ... USING (...)`, y `current_setting` para
-     pasar el tenant del request. Es la defensa-en-profundidad de la §6.
+     pasar el tenant del request. Es la defensa-en-profundidad de la §6. **Prestá atención a
+     `SET LOCAL` vs `SET`**: con connection pooling en producción, un `SET` sin `LOCAL` deja el
+     tenant seteado pegado a la conexión y puede filtrarse al siguiente request que la reuse — el
+     detalle que separa "lo implementé" de "lo implementé bien".
    - **pgvector + filtros de metadata** — repo `github.com/pgvector/pgvector`, sección de filtrado:
      cómo combinar `WHERE` (el filtro de tenant) con el operador de distancia, y la nota sobre
      índices con filtros (pre/post-filtering). ~40 min en total.
@@ -53,22 +66,39 @@ design. No leas todo de corrido — leé Core, construí, y volvé a Referencia 
 - **Pydantic** — `docs.pydantic.dev` — `BaseModel`, `Field(description=...)`, validators. El schema
   que Instructor consume. (Ya lo tocaste en M0.)
 - **JWT** — `jwt.io` (intro + debugger) y la librería que uses (`pyjwt` para Python:
-  `pyjwt.readthedocs.io`). Buscá: estructura header.payload.signature, **verificación de la firma**
-  (lo único que da garantía), y cómo leer un claim (`tenant_id`). Clave: verificar ≠ decodificar.
-- **FastAPI — Security / dependencies** — `fastapi.tiangolo.com/tutorial/security/` y
-  `.../dependencies/`. Cómo armar una dependency que verifica el JWT y devuelve el `tenant_id`
-  inyectable en cada endpoint (el lugar correcto para extraer el tenant una sola vez).
-- **Railway docs** (`docs.railway.app`) o **Fly.io docs** (`fly.io/docs`) — deploy + TLS automático
-  en el dominio asignado + variables de entorno (tu OpenAI key, el secret del JWT). Para el deploy
-  público del checkpoint.
+  `pyjwt.readthedocs.io`, pineá **`pyjwt>=2.13`**). Buscá: estructura header.payload.signature,
+  **verificación de la firma** (lo único que da garantía), y cómo leer un claim (`tenant_id`).
+  Clave: verificar ≠ decodificar. Nota de versión: PyJWT 2.13 (mayo 2026, ver
+  `pyjwt.readthedocs.io/en/stable/changelog.html`) endureció el default de seguridad — una clave
+  HMAC vacía (típico bug de env var faltante) ahora lanza `InvalidKeyError` en vez de fallar
+  silenciosamente, y `PyJWKClient` fuerza que el algoritmo del header coincida con tu allow-list.
+  Si pineás una versión vieja, tu verificación de JWT del paso 4 de `practica.md` puede tener
+  agujeros que 2.13 ya cierra.
+- **FastAPI — Security / dependencies** — `fastapi.tiangolo.com/tutorial/security/simple-oauth2/`
+  y `.../dependencies/`. Cómo armar una dependency que verifica el JWT y devuelve el `tenant_id`
+  inyectable en cada endpoint (el lugar correcto para extraer el tenant una sola vez). Fijá una
+  versión mínima de FastAPI en tu `pyproject.toml` (el framework itera rápido — refactor de router
+  internals el 1 de julio 2026 — aunque este patrón de seguridad no tuvo cambios breaking).
+- **Railway docs** (`docs.railway.com/networking/domains`) o **Fly.io docs** (`fly.io/docs`,
+  `fly.io/pricing`) — deploy + TLS automático (Let's Encrypt) en el dominio asignado + variables de
+  entorno (tu OpenAI key, el secret del JWT). El TLS es gratis en ambos; el **hosting** sigue una
+  cascada distinta en cada uno: **Fly.io** da un trial de 2 VM-horas/7 días y después cobra desde
+  el primer dólar (100% pay-as-you-go, pide tarjeta, sin plan gratis de respaldo). **Railway** da
+  un trial de 30 días con $5 de crédito y, al vencer, *no* salta directo a Hobby $5/mes — cae a un
+  **Free plan** con ~$1/mes de crédito perpetuo (irrisorio para correr algo 24/7, pero existe)
+  antes de que necesites pasarte a Hobby para uso real. Ninguno te deja correr el checkpoint gratis
+  indefinidamente; presupuestalo antes de comprometerte al deploy.
 - **Mermaid** (`mermaid.js.org`) o **Excalidraw** (`excalidraw.com`) — para el diagrama de
   arquitectura del README/checkpoint. Mermaid si lo querés versionado en el repo.
 
 ## Deep dive (opcional, para defender mejor en system design)
 
-- **Chip Huyen — "AI Engineering"** (O'Reilly, 2025). Para M4: el capítulo de **structured outputs
-  / constrained generation** y la discusión de **confianza/calibración y abstención**. La fuente
-  que da autoridad cuando te preguntan "¿de dónde sacaste esto?".
+- **Chip Huyen — "AI Engineering"** (O'Reilly, 2025; repo de ejemplos `github.com/chiphuyen/aie-book`).
+  Para M4, específicamente: el capítulo **"Structured Outputs"** (constrained generation) y el
+  capítulo de **"Evaluation"** en la parte de calibración/abstención — no hace falta leer el libro
+  entero. Es un libro de un año (jul 2026), así que tratalo como fuente de *principios* de diseño
+  (evals, calibración, structured generation), no como referencia de qué modelo o API usar hoy —
+  para eso, la doc viva de cada provider (arriba) es la fuente de verdad.
 - **Andrej Karpathy — "makemore" (parte 2/3: el MLP)** — serie *Neural Networks: Zero to Hero*
   (YouTube) + repo `github.com/karpathy/makemore`. **Side-quest B.** Buscá: cómo el MLP produce
   *logits* → *softmax* → distribución sobre el siguiente caracter, y la **negative log likelihood**

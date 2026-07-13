@@ -60,6 +60,14 @@ La **temperature** es una perilla sobre el softmax:
 Esto no es teoría abstracta: es el parámetro `temperature` que pasás en cada llamada al LLM de
 Grounded. En soporte querés temperature baja (respuestas consistentes y fieles al contexto).
 
+> **Ojo con modelos de razonamiento:** los modelos de razonamiento de OpenAI (la serie `o1`/`o3`
+> y toda la línea `gpt-5`/`gpt-5.1`/`gpt-5.2`/`gpt-5.6`, esta última lanzada 9-jul-2026) **no
+> aceptan** el parámetro `temperature` — la API lo rechaza o lo ignora fijándolo en 1 internamente
+> (excepción: `gpt-5.1`+ con `reasoning_effort="none"` sí lo respeta; el rango completo de
+> `reasoning_effort` es `none`/`low`/`medium`/`high`/`xhigh`/`max`, default `medium`). Si el LLM de
+> Grounded es un modelo de razonamiento, "la perilla de temperature" no aplica tal cual — primero
+> confirmá qué modelo llama tu endpoint.
+
 > **Checkpoint:** ¿por qué en un RAG de soporte usás temperature baja? Porque no querés
 > creatividad: querés la respuesta más fiel al contexto recuperado, repetible.
 
@@ -98,6 +106,18 @@ Por qué te importa como AI Engineer: los logprobs son una **señal de confianza
 del modelo**. Si una respuesta de Grounded tiene logprobs muy bajos (el modelo dudó en cada
 token), es candidata a **abstención** ("no estoy seguro") en vez de alucinar. Esto es exactamente
 el tema de *confidence* de M4 — y por eso la práctica de SQ-B instrumenta logprobs en el producto.
+
+> **Mismo caveat que con temperature:** los modelos de razonamiento de OpenAI (`o1`/`o3`,
+> `gpt-5`/`gpt-5.1`/`gpt-5.2`/`gpt-5.6`) tampoco devuelven `logprobs` por defecto — la API responde
+> con un error. Antes de instrumentar esto en `practica.md` necesitás saber si el LLM de Grounded es
+> de razonamiento o no; si lo es, o usás `reasoning_effort="none"` (solo `gpt-5.1`+) o un modelo
+> no-razonador (`gpt-4o`, `gpt-4.1`, `gpt-4o-mini`).
+>
+> **Hay un segundo gate, independiente del modelo:** OpenAI tiene dos APIs para chat — la
+> **Chat Completions API** (clásica) y la **Responses API** (la que OpenAI recomienda ahora por
+> default). La Responses API **no soporta `logprobs` en absoluto**, sea cual sea el modelo. Si
+> Grounded llama al LLM vía Responses API, instrumentar logprobs no es cuestión de elegir mejor
+> modelo — hace falta usar Chat Completions para ese endpoint, o resignarse a no tener la señal.
 
 ---
 

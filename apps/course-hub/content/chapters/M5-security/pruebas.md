@@ -90,7 +90,9 @@ gate: pending
    privados, (2) exposición a contenido no confiable, (3) capacidad de comunicación externa. Que la
    presencia simultánea hace exfiltrable al sistema. Que la defensa es eliminar una pata, no agregar
    guardrails (Willison: *"ningún producto de guardrails previene el 95% de los ataques"*). Ataques
-   reales: Supabase MCP (jul-2025), Summer of Johann (ago-2025).
+   reales: Supabase MCP (jul-2025), Summer of Johann (ago-2025), LiteLLM supply-chain backdoor y
+   postmark-mcp (2026). Bonus: la tendencia 2026 de cortar una pata deterministamente en vez de
+   evaluarla con el propio LLM (OpenAI Lockdown Mode).
 
 2. **"¿Qué son los Agents Rule of Two?"** — Máximo 2 de las 3 propiedades riesgosas de la trifecta
    en un agente. Si tiene las tres, hay que quitar una antes de deployar. Inspirado en el Chrome
@@ -137,6 +139,11 @@ gate: pending
 11. **"Nombrá los riesgos de OWASP LLM que tu sistema toca, por ID y nombre."** — **LLM01 Prompt
     Injection**, **LLM02 Sensitive Information Disclosure**, **LLM06 Excessive Agency**, **LLM08
     Vector & Embedding Weaknesses**, **LLM09 Misinformation**. Y por qué LLM01 es el #1.
+
+11b. **"¿El LLM Top 10 y el ASI Top 10 son la misma lista?"** — No: son dos frameworks OWASP
+    distintos y coexistentes. LLM Top 10 (LLM01-LLM10, riesgos del modelo/app, vigente desde
+    mar-2025) vs ASI Top 10 (ASI01-ASI10, riesgos de comportamiento agéntico, dic-2025). No hubo
+    renumeración de la primera; la segunda es nueva y complementaria.
 
 12. **"¿Por qué los tests de seguridad corren con los evals (M2) y no aparte?"** — Porque un test de
     seguridad **es un eval adversarial**: entrada conocida (ataque) → salida esperada (que NO funcione).

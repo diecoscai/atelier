@@ -25,9 +25,11 @@ Al terminar M7 tenés que poder, en el nivel honesto indicado:
 - **(can-explain)** **Drift**: cómo la calidad se degrada en el tiempo (cambio de modelo del
   proveedor, cambio de distribución de queries) y cómo lo detectás corriendo el harness de M2 de
   forma continua + señales online; cómo hacés **A/B de prompts** sin drift accidental.
-- **(can-defend)** Cuándo usar un **modelo open-source self-hosted** (Ollama / Llama 3.1) en vez de
-  la API de OpenAI, con la **tabla comparativa de costo/calidad/latencia** (+ privacidad/operación)
-  hecha con *tus* números — y por qué el swap fue trivial (programaste contra la interfaz estándar).
+- **(can-defend)** Cuándo usar un **modelo open-source self-hosted** (Ollama / Qwen3 como referencia
+  2026, o Llama, Gemma, Phi — Llama 4 como techo de familia, pero fuera del alcance de una laptop)
+  en vez de la API de OpenAI, con la **tabla comparativa de costo/calidad/latencia**
+  (+ privacidad/operación) hecha con *tus* números — y por qué el swap fue trivial (programaste
+  contra la interfaz estándar).
 - **(awareness)** **Quantization**: qué es (FP16 → INT8/INT4), el trade-off tamaño/calidad/velocidad,
   qué es **GGUF**, y por qué INT4/GGUF es lo que hace que un 8B corra en tu laptop.
 - **(can-defend)** Por qué **async simple alcanza** (YAGNI) y exactamente qué síntoma medido te haría

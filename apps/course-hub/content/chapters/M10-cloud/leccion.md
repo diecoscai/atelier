@@ -8,7 +8,7 @@ duration: ~8-10h lectura + 1-2 findes de práctica
 # M10 — Sacarlo del PaaS, servirlo vos mismo, y poder rendir cuentas
 
 > **Qué vas a saber al terminar esta lección:** mover tu deploy de un PaaS (Railway/Fly) a un
-> cloud de los grandes (GCP Cloud Run o AWS App Runner) con infraestructura-como-código, explicar
+> cloud de los grandes (GCP Cloud Run o AWS ECS Express Mode/App Runner) con infraestructura-como-código, explicar
 > por qué eso importa para un rol de AI Engineer, correr tu *propio* servidor de inferencia con
 > vLLM y medir cuánto throughput te da vs la API de OpenAI, y producir los dos artefactos de
 > governance que un producto EU-facing necesita (model card + dónde caés en el EU AI Act). La
@@ -57,8 +57,8 @@ Hay dos formas malas de "tapar" este gap y una buena:
 | **Un curso de certificación AWS** | Estudiar para el examen | ⚠️ Conocimiento sin artefacto. Sabés trivia, no tenés un deploy que mostrar. |
 | **Deployar Grounded de verdad a UN big-3 con IaC** ✅ | Mover el sistema real, escribir la infra como código | El artefacto *es* la evidencia. Podés mostrar el Terraform, el deploy vivo, y defender cada decisión. |
 
-**Elegimos uno solo** (GCP Cloud Run *o* AWS App Runner), no los tres. Aprender un big-3 a fondo
-vale más que tres a nivel superficial, y los conceptos transfieren. Esto es un ADR
+**Elegimos uno solo** (GCP Cloud Run *o* AWS ECS Express Mode/App Runner), no los tres. Aprender un
+big-3 a fondo vale más que tres a nivel superficial, y los conceptos transfieren. Esto es un ADR
 (`ADR-0X0: por qué Cloud Run y no ECS/Lambda/App Runner`).
 
 > **Checkpoint:** ¿por qué no alcanza con tener el deploy en Railway y decir "deployé a la nube"?
@@ -84,8 +84,13 @@ Lo que cambia al pasar a un big-3 no es la imagen, es **dónde y cómo la corré
   - **GCP Cloud Run** — corré un contenedor que escucha en un puerto HTTP; Google maneja todo lo
     demás (scaling 0→N, TLS, balanceo). Es el "Railway de GCP" pero es GCP de verdad.
   - **AWS App Runner** — el equivalente de AWS: dale una imagen de ECR, escucha un puerto, escala
-    solo. (ECS/Fargate es el primo más configurable y más laborioso; App Runner es el atajo
-    correcto para esto.)
+    solo. (ECS/Fargate es el primo más configurable y más laborioso; App Runner era el atajo
+    correcto para esto.) **Nota (vigente desde abr-2026):** AWS puso App Runner en *maintenance
+    mode* el 30-abr-2026 — deja de aceptar cuentas nuevas (el servicio sigue andando para quien ya
+    lo tenía). Si arrancás en AWS hoy, la ruta recomendada es **ECS Express Mode** (lanzado en
+    re:Invent nov-2025): misma simplicidad de "dale una imagen y andá", pero sobre ECS, con el
+    feature-set completo de ECS disponible si después lo necesitás. Elegí ECS Express Mode salvo
+    que ya tengas un App Runner corriendo.
 
 **Por qué serverless-de-contenedor y no Kubernetes (GKE/EKS):** K8s es la respuesta a un problema
 que no tenés. Te da control total sobre orquestación, pero a cambio de operar un cluster (nodos,
@@ -108,10 +113,15 @@ deploy arranca y muere. Este es el error #1 de la primera vez:
 
 ```dockerfile
 # services/api/Dockerfile
-FROM python:3.11-slim
+# 3.13, no la más nueva (3.14 es la estable actual desde oct-2025): 3.13 tiene mejor cobertura
+# de ruedas precompiladas en el ecosistema ML/data si más adelante sumás libs pesadas. Si no las
+# necesitás, 3.14-slim también es válida y algo más rápida (specializing interpreter).
+FROM python:3.13-slim
 
-# uv para instalar deps rápido y reproducible
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv para instalar deps rápido y reproducible. Versión PINEADA, no "latest":
+# uv saca releases casi semanales y a veces cambia comportamiento sin aviso
+# (ej. 0.11.26, jun-2026, empezó a rechazar sdists con tar mal formado que antes aceptaba).
+COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /usr/local/bin/uv
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
@@ -147,6 +157,15 @@ el secret, y el permiso de acceso público. Esto es Cloud Run:
 
 ```hcl
 # infra/main.tf
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 7.0"   # PINEADO, no "latest": el provider saltó 5.x→6.x→7.x en 2025-2026,
+    }                      # cada mayor con breaking changes. "latest" te rompe el apply sin aviso.
+  }
+}
+
 provider "google" {
   project = var.project_id
   region  = "europe-west1"   # EU: decisión deliberada, ver §6 (governance / data residency)
@@ -285,6 +304,13 @@ todas trabajando. Por eso vLLM rinde mucho más que un loop ingenuo de `model.ge
 vLLM expone un servidor **compatible con la API de OpenAI** — el truco que hace que tu código no
 cambie: apuntás el mismo cliente de OpenAI a tu `localhost` en vez de a `api.openai.com`.
 
+Usamos `Llama-3.2-1B-Instruct` a propósito: es chico, entra en una GPU de entrada, y sigue
+publicado y descargable en Hugging Face sin cambios. Meta ya sacó **Llama 4** (Scout/Maverick,
+multimodal, contexto hasta 10M tokens) pero necesita muchísima más VRAM que una T4/A10 — no es la
+elección para este ejercicio de presupuesto bajo. Para "corrí vLLM y medí throughput" el modelo
+chico es la decisión correcta; para "sirvo el mejor modelo abierto disponible" sería Llama 4, en
+otra infra.
+
 ```bash
 # En la GPU prestada (Colab T4 / RunPod). Modelo chico que entra en una T4 (~16GB).
 pip install vllm
@@ -347,8 +373,8 @@ propio throughput pero vos no controlás el batching ni la VRAM). **Tu entregabl
 comparativa**, no un "anduvo".
 
 > Esto NO prueba que vLLM "le gana" a OpenAI — son cosas distintas (un modelo de 1B en una T4 vs
-> GPT-4o en la infra de OpenAI). Lo que prueba es que **entendés y sabés medir** las palancas de
-> inference optimization. Ese es el claim honesto.
+> el modelo flagship de turno de OpenAI en su propia infra). Lo que prueba es que **entendés y sabés
+> medir** las palancas de inference optimization. Ese es el claim honesto.
 
 ---
 
@@ -365,8 +391,17 @@ y corta que documenta un modelo para que terceros — y tu yo futuro — sepan q
 condiciones, y dónde *no* confiar en él. No es un paper, es una página. Para Grounded documenta el
 **sistema RAG completo**, no solo el LLM base. Secciones:
 
-- **Detalles del modelo/sistema:** qué LLM (GPT-4o-mini / tu vLLM), qué embeddings
-  (`text-embedding-3-small`), reranker, versión, fecha.
+- **Detalles del modelo/sistema:** qué LLM (a jul-2026, la familia vigente de OpenAI es **GPT-5.6**:
+  *Sol* para trabajo frontier/complejo, *Terra* como default de costo/inteligencia — el reemplazo
+  natural de GPT-4o —, *Luna* para alto volumen/bajo costo — el reemplazo de GPT-4o-mini —, o tu
+  vLLM), qué embeddings (`text-embedding-3-small`; `-large` si priorizás precisión sobre
+  costo/latencia), reranker, versión, fecha. **Ojo con los nombres de modelo:** OpenAI los rota
+  seguido — GPT-4o y GPT-4o-mini, que este curso usaba de referencia, se retiraron de **ChatGPT**
+  en feb 2026 (y `gpt-4o-mini` de Azure OpenAI Foundry en mar 2026); en la API directa de OpenAI
+  todavía responden pero quedaron marcados **legacy/deprecados** (ver `/deprecations`). La model
+  card tiene que fechar y versionar el modelo exacto que usás, no solo el nombre de la familia —
+  y en producción, pinear ese nombre explícito en config (no `-latest`), porque OpenAI puede
+  redirigir alias a un modelo distinto de un día para el otro.
 - **Uso previsto:** responder preguntas de soporte de clientes B2B sobre la documentación *del
   tenant*, con citas. **Out of scope:** asesoramiento legal/médico/financiero, decisiones
   automatizadas sobre personas.
@@ -390,7 +425,7 @@ como el GDPR. Clasifica por **riesgo**, no por tecnología, en cuatro niveles:
 
 | Nivel de riesgo | Qué cae acá | Régimen |
 |---|---|---|
-| **Inaceptable (prohibido)** | Social scoring estatal, manipulación subliminal, scraping masivo de caras, real-time biometric ID en espacios públicos (con excepciones) | **Prohibido.** Aplica desde feb 2025. |
+| **Inaceptable (prohibido)** | Social scoring estatal, manipulación subliminal, scraping masivo de caras, real-time biometric ID en espacios públicos (con excepciones) | **Prohibido desde feb 2025** (ya vigente). |
 | **Alto riesgo** | IA en infraestructura crítica, educación, empleo/RRHH (filtrar CVs), crédito, justicia, biometría | Permitido con **obligaciones fuertes**: gestión de riesgo, calidad de datos, documentación técnica, supervisión humana, registro, evaluación de conformidad. |
 | **Riesgo limitado** | Chatbots, sistemas que interactúan con personas, contenido generado por IA | **Obligación de transparencia:** el usuario tiene que *saber que habla con una IA* y el contenido generado debe ser identificable. |
 | **Riesgo mínimo** | El resto (filtros de spam, IA en videojuegos) | Sin obligaciones específicas; códigos de conducta voluntarios. |
@@ -406,8 +441,16 @@ Dos matices que suman puntos:
 - **GPAI (modelos de propósito general).** Hay obligaciones separadas para *proveedores* de modelos
   base (OpenAI, Meta). Vos sos *deployer/proveedor de un sistema downstream*, no proveedor del
   modelo base — esa distinción importa y la tenés que poder nombrar.
-- **Timeline escalonado.** Prohibiciones: feb 2025. Reglas de GPAI: ago 2025. El grueso de
-  high-risk: 2026-2027. No todo está vigente hoy; saber que es escalonado es señal de que lo leíste.
+- **Timeline escalonado, y ya cambió una vez.** Prohibiciones: vigentes desde feb 2025. Reglas de
+  GPAI: vigentes desde ago 2025. El grueso de high-risk (Anexo III) iba a entrar en ago 2026, pero
+  el **"Digital Omnibus on AI"** (el Parlamento dio su visto bueno el 16-jun-2026 y el Consejo de
+  la UE la luz verde final el 29-jun-2026) lo aplazó: las obligaciones de sistemas de alto riesgo de
+  uso (Anexo III) pasan a **dic 2027** (+16 meses), y las de alto riesgo embebido en producto
+  regulado (Anexo I) a **ago 2028** (+1 año). Lo que **no** se movió: la obligación de transparencia
+  del **Art. 50** (avisar interacción con IA, etiquetar contenido generado) — la tuya como deployer
+  de riesgo limitado — sigue en su fecha original, **2-ago-2026**, todavía no vigente hoy pero sin
+  aplazamiento. Saber que el calendario de high-risk se movió y el tuyo no — y por qué — es la
+  señal de que seguís las noticias regulatorias y no memorizaste una fecha vieja.
 
 - **Conexión data residency (cierra con §3):** elegiste región `europe-west1` en el Terraform. Eso
   no es decoración — para clientes EU, mantener el cómputo y los datos en la UE es parte de la
@@ -446,12 +489,17 @@ decisión defendible.
 ## 8. Awareness: swap a un LLM managed (Bedrock / Vertex)
 
 Una tercera opción entre "API de OpenAI" y "self-host vLLM": un **LLM managed de tu propio cloud** —
-**AWS Bedrock** o **GCP Vertex AI**. Le pedís a tu cloud que sirva modelos (Claude, Llama, Mistral,
-Gemini) por vos: no operás GPU, pero los datos y el billing quedan dentro de tu cuenta de cloud
-(mejor para data residency / compliance EU que llamar a un tercero). Por qué te importa aunque no
-lo construyas: es la respuesta a "¿cómo das garantías de data residency sin operar GPUs?" → "muevo
-la inferencia a Bedrock/Vertex en mi región EU". Y como tu app ya es OpenAI-compatible y
-desacoplada del proveedor (§5.2), el swap es de configuración. Awareness, no build.
+**AWS Bedrock** o **GCP Vertex AI**. Le pedís a tu cloud que sirva modelos por vos: no operás GPU,
+pero los datos y el billing quedan dentro de tu cuenta de cloud (mejor para data residency /
+compliance EU que llamar a un tercero). El catálogo es mucho más grande de lo que sugiere cualquier
+lista fija, y **ya no es mono-proveedor**: Bedrock sirve 100+ modelos de 17+ proveedores (Claude,
+Llama, Mistral, Cohere, Amazon Nova... y desde 2025 sumó también Google y OpenAI), y Vertex AI —con
+Gemini como buque insignia— sumó a su vez Claude y Grok de terceros. Los dos big-3 clouds terminaron
+sirviendo la misma sopa de modelos; la lista crece cada trimestre, así que no memorices nombres —
+memorizá el patrón (y que el vendor lock-in de LLM en un cloud es cada vez menos real). Por qué te
+importa aunque no lo construyas: es la respuesta a "¿cómo das garantías de data residency sin operar
+GPUs?" → "muevo la inferencia a Bedrock/Vertex en mi región EU". Y como tu app ya es OpenAI-compatible
+y desacoplada del proveedor (§5.2), el swap es de configuración. Awareness, no build.
 
 ---
 

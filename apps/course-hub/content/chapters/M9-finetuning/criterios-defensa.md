@@ -28,7 +28,11 @@ clasificación es *can-defend-in-system-design*; en correr un QLoRA es *can-buil
   estilo). Drill: ¿cuál es la métrica de eval que no se mueve con prompting y justifica el FT?
 - **(can-explain)** Los métodos de fine-tuning: SFT (comportamiento/formato), DPO (preferencias),
   RFT (solo reasoning models); que GPT-5.x no es fine-tuneable; nombrar el método y el modelo
-  compatible al proponer fine-tuning.
+  compatible al proponer fine-tuning. Y saber que OpenAI anunció (may-2026) el cierre gradual de su
+  plataforma self-serve de fine-tuning (orgs nuevas bloqueadas desde may-2026, orgs inactivas
+  pierden acceso a jobs nuevos desde jul-2026, cierre total ene-2027) — citando que sus modelos base
+  más nuevos ya siguen instrucciones lo bastante bien como para necesitar fine-tuning con menos
+  frecuencia. Esto es evidencia concreta a favor del decision framework, no un detalle menor.
 - **(can-explain)** Embedding fine-tuning de dominio: que el *retrieval* también se fine-tunea (con
   pares de tu dominio + contrastive loss) y cuándo es el siguiente paso después del reranking.
 - **(can-build)** Entrenar un clasificador de intents (Banking77) con sklearn y reportar

@@ -32,10 +32,14 @@ La definición de Andrej Karpathy (tweet del 25-jun-2025, la que cristalizó el 
 > *"Context engineering is the delicate art and science of filling the context window with the
 > right information in the right format at the right time."*
 
-La atribución completa: Tobi Lütke (Shopify) fue el primero en usar el término viralmente el
-19-jun-2025; Karpathy lo formalizó seis días después; Jason Liu desarrolló el marco aplicado a RAG
-desde ago-2025; Gartner lo hizo mainstream: *"context engineering is in, prompt engineering is
-out"*.
+La atribución completa (con el matiz que suele faltar): Walden Yan (Cognition, el equipo de Devin)
+ya escribía sobre el concepto *antes* de que se viralizara; Tobi Lütke (Shopify) lo tuiteó el
+19-jun-2025 y fue la referencia que lo hizo viral; Karpathy lo formalizó seis días después, el
+25-jun-2025; Jason Liu desarrolló el marco aplicado a RAG desde ago-2025; Gartner lo hizo
+mainstream con el reporte *"Lead the Shift to Context Engineering as Prompt Engineering Fades"*
+(jul-2025): *"context engineering is in, prompt engineering is out"*. Gartner siguió esa línea
+declarando 2026 *"the year of context"* — la señal de que esto no fue un hype de un tweet sino una
+disciplina que se consolidó.
 
 Por qué importa nombrarlo: Anthropic lo llama el "job #1 of engineers building AI agents"; es el
 keyword que los ATS de 2026 escanean; y el contexto inflado es, según el blog de Anthropic
@@ -181,8 +185,12 @@ salen en una sola lista quedan abajo. Eso es exactamente el comportamiento desea
 
 > **Checkpoint:** ¿qué hace el `k=60`? Controla cuánto pesan las posiciones altas. `k` chico →
 > el top-1 domina (parecido a "el que ganó una lista gana todo"). `k` grande → aplana, premia el
-> consenso entre listas. 60 es el default del paper y un punto de partida sensato; es un knob que
-> podés barrer en tu harness si querés justificar otro valor con números.
+> consenso entre listas. 60 es el default del paper (2009) y la literatura reciente confirma que
+> RRF no es muy sensible a `k` — es un punto de partida sensato para arrancar. Cuándo sí vale la
+> pena barrerlo en tu harness: cuando tu corpus tiene una distribución de relevancia muy distinta a
+> la de un benchmark genérico (ej. investigación de 2026 sobre retrieval de patentes encontró que
+> `k=30` era mejor para ese corpus específico). Si tu dominio es idiosincrático, no asumas 60 —
+> medilo.
 
 ---
 
@@ -192,6 +200,14 @@ No necesitás un motor de búsqueda aparte (Elasticsearch). Postgres hace **las 
 para dense (ya lo tenés de M0) y **full-text search nativo** (`tsvector` / `ts_rank`) para la
 parte léxica. `ts_rank` no es BM25 *exacto*, pero es la misma familia (TF-IDF léxico) y alcanza
 de sobra para el curso; cuando quieras BM25 estricto, la extensión `pg_search` (ParadeDB) lo da.
+
+> **Nota de versiones (jul-2026):** pgvector está en la serie 0.8.x (0.8.5 compila contra
+> Postgres 18, la versión estable actual con un I/O subsystem nuevo — hasta 3x más rápido en
+> lecturas); ya salió **Postgres 19 Beta 1** (jun-2026) con GA estimado para fin de año, así que no
+> te sorprenda si tu proveedor te empuja a migrar durante el curso. Si pensás usar `pg_search`
+> (ParadeDB) sobre **Neon**: desde mar-2026 ya no está disponible para proyectos nuevos (solo los
+> existentes lo conservan) — confirmá con tu hosting antes de apoyarte en esa extensión, o quedate
+> con `ts_rank` nativo, que alcanza para este módulo.
 
 Agregás una columna de búsqueda léxica y un índice GIN:
 
@@ -288,15 +304,28 @@ alta donde importa. Hacés barato el filtro grueso y caro solo el ajuste fino so
 
 ### Cohere rerank vs cross-encoder self-hosted
 Dos formas de tener el cross-encoder:
-- **Cohere Rerank (API)** — `rerank-v3.5` (o multilingüe). Le mandás query + lista de documentos,
-  te devuelve los índices reordenados con relevance scores. Cero infra, multilingüe out-of-the-box
-  (clave para soporte en español), pago por uso, latencia de red. **Empezás acá** (DESIGN: Cohere
-  como start) — es la decisión correcta para validar que rerank mueve la aguja antes de operar
-  un modelo.
-- **Cross-encoder self-hosted** — ej. `BAAI/bge-reranker-v2-m3` o un `ms-marco-MiniLM` vía
-  `sentence-transformers`. Sin costo por llamada y sin mandar datos a un tercero (privacidad B2B),
-  pero ahora **operás un modelo**: GPU o CPU lento, batching, latencia, deploy. Migrás acá cuando
-  *medís* que el volumen o el compliance lo justifican — el mismo criterio YAGNI de pgvector en M0.
+- **Cohere Rerank (API)** — desde dic-2025 la línea vigente es **Rerank 4**: `rerank-v4.0-pro`
+  (máxima calidad, ventana de 32K tokens, 100+ idiomas, entiende contenido semi-estructurado —
+  JSON, tablas, código) y `rerank-v4.0-fast` (menor latencia, el punto de partida más barato). Le
+  mandás query + lista de documentos, te devuelve los índices reordenados con relevance scores.
+  Cero infra, multilingüe out-of-the-box (clave para soporte en español), pago por uso, latencia
+  de red. **Empezás acá** (DESIGN: Cohere como start) — es la decisión correcta para validar que
+  rerank mueve la aguja antes de operar un modelo.
+  > ⚠️ **`rerank-v3.5` deja de recibir tráfico el 1-ago-2026.** Si veías ese nombre en versiones
+  > anteriores de este curso, es porque era el vigente hasta ahora. A partir de esa fecha Cohere
+  > enruta automáticamente el tráfico de v3.5 a `rerank-v4.0-fast`, y los `relevance_score` **no
+  > son comparables** entre versiones — si tenés un threshold hardcodeado, re-calibralo con el
+  > harness después de migrar.
+- **Cross-encoder self-hosted** — ej. `BAAI/bge-reranker-v2-m3` (sigue siendo el estándar de facto,
+  sin sucesor mayor) o un `ms-marco-MiniLM` vía `sentence-transformers`. Sin costo por llamada y
+  sin mandar datos a un tercero (privacidad B2B), pero ahora **operás un modelo**: GPU o CPU lento,
+  batching, latencia, deploy. Migrás acá cuando *medís* que el volumen o el compliance lo
+  justifican — el mismo criterio YAGNI de pgvector en M0. El ecosistema self-hosted se diversificó
+  bastante en 2026 — `Qwen3-Reranker` (0.6B/4B/8B), `Jina Reranker v2`, `ZeroEntropy zerank-2`
+  (multilingüe, del orden de 40x más barato que Cohere) y `KaLM-Reranker-V1` (arxiv, jun-2026) — no
+  hace falta perseguir cada release, pero antes de asumir que `bge-reranker-v2-m3` es la única
+  opción, vale correr un benchmark rápido contra tu golden set: puede que una de estas alternativas
+  te dé un punto intermedio (más barato que Cohere, sin la fricción de operar GPU propia).
 
 ### El número que justifica todo el módulo
 El dato real de la literatura (Pinecone, Cohere y otros lo reportan consistente): **hybrid +
@@ -357,7 +386,10 @@ LLM sobre los chunks recuperados de verdad.
   (cada transformación es +1 llamada LLM *antes* de buscar) no compensa. **HyDE puede alucinar
   hacia el lado equivocado** y *empeorar* el retrieval si la query es muy out-of-domain. Por eso
   **lo medís con el harness**: agregás la transformación, corrés recall@5, y la mantenés solo si
-  sube. No la metés "porque suena bien".
+  sube. No la metés "porque suena bien". El consenso 2026 es no dejarla siempre-on sino **gateada**:
+  solo disparás HyDE cuando la similitud query-doc de la búsqueda directa es baja (señal de brecha
+  de vocabulario), y siempre validás el resultado con el reranker después — así el costo extra solo
+  se paga cuando hay evidencia de que hace falta.
 
 > **Checkpoint:** ¿por qué embeber una respuesta inventada mejora el retrieval? Porque el match
 > de embeddings es más fuerte documento-vs-documento que pregunta-vs-documento. El doc hipotético
@@ -415,6 +447,16 @@ categories: {oauth: 12, api_keys: 23, saml: 12}, date_range: {oldest: 2023-01, n
 El patrón en la práctica: tu `search_docs` del MCP server devuelve no solo los chunks sino también
 un bloque de metadata de la búsqueda. El agente lo usa para decidir si profundiza o expande.
 
+**Hacia dónde va esto en 2026:** Liu extendió la idea de facets a lo que llama *"agent peripheral
+vision"* — pistas estructuradas sobre el espacio de información completo, no solo el top-k que
+devolviste, para que el agente sepa qué se está perdiendo sin tener que pedirlo explícitamente. Y
+viene sosteniendo una postura más fuerte: que el RAG semántico "de chatbot" (embed-and-retrieve,
+sin estructura) está mal calzado para sistemas agénticos y hay que rediseñar el retrieval pensando
+en el agente desde el principio, no adaptar un pipeline pensado para responder una sola pregunta.
+No hace falta construir "peripheral vision" en M3 — es awareness para cuando diseñes retrieval para
+agentes en serio — pero conecta directo con por qué facets y el patrón de tool (§9) importan más de
+lo que parecen a primera vista.
+
 ```python
 @mcp.tool()
 def search_docs(query: str, top_k: int = 5) -> dict:
@@ -438,6 +480,15 @@ Por qué: los embeddings capturan significado semántico, pero código tiene *es
 — nombres de funciones, imports, signatures. `search_for_function("parse_jwt_claims")` con grep
 encuentra el resultado exacto; los embeddings de una función y su llamadora son parecidos pero no
 idénticos, y la consulta por nombre exacto no se beneficia del espacio semántico.
+
+Ojo con sobre-generalizar esa conclusión: Liu publicó dos seguimientos ese mismo mes que matizan el
+punto para que no se lea como "abandoná RAG" — *"Why I Stopped Using RAG for Coding Agents (And You
+Should Too)"* y *"Rethinking RAG Architecture for the Age of Agents"* (ambos 11-sep-2025, jxnl.co).
+El argumento real no es tirar el retrieval estructurado, sino **exponerlo como una tool más que el
+agente invoca a discreción** — combinando grep/exploración libre con búsqueda estructurada cuando
+conviene, en vez de forzar retrieval en cada turno. Es el mismo patrón que vas a construir en §9: tu
+`search_docs` es una tool que el agente decide cuándo llamar, no el único camino de acceso a la
+información.
 
 La conclusión que hay que poder defender: **elegir el método de retrieval según las propiedades del
 dominio**, no por default:
@@ -470,6 +521,13 @@ prompts / few-shot examples que maximizan una métrica tuya sobre un set de ejem
 | Cuándo conviene | pipelines chicos, pocos prompts | muchos prompts encadenados, métrica clara, querés evitar drift al cambiar de modelo |
 | Costo | tu tiempo | llamadas LLM de la optimización + curva de aprendizaje |
 
+**Update 2026:** DSPy maduró más rápido de lo esperado. La serie estable 3.x adoptó **GEPA**
+(Genetic-Pareto, un optimizer reflexivo que en varios benchmarks supera a RL para optimizar
+prompts) como pieza central, y ya es una opción real de producción para pipelines con muchos
+prompts encadenados — no solo un experimento académico. Si en M5+ terminás con una cadena de 4-5
+prompts y una métrica clara (como la tuya de M2), DSPy+GEPA es la primera alternativa seria al
+hand-tuning que vale la pena mirar.
+
 Nivel de este curso: **awareness / can-explain.** No vas a construir un pipeline DSPy en M3. Tenés
 que poder explicar *qué* problema ataca (el tuning manual no escala ni es reproducible), *cómo* se
 relaciona con tu harness de M2 (DSPy necesita exactamente una métrica como la tuya para optimizar),
@@ -488,6 +546,15 @@ ahora mismo. Vale la pena entender qué es antes de construirlo.
 analogía que circula y que sirve: **MCP es el "USB-C de las apps de IA"** — un único protocolo
 estándar para que cualquier cliente (Claude Desktop, Cursor, etc.) hable con cualquier servidor de
 capacidades, en vez de una integración custom por cada par cliente×herramienta (el problema N×M).
+
+> ⚠️ **La spec evoluciona rápido — no la trates como congelada.** La versión estable vigente es
+> **2025-11-25** (`modelcontextprotocol.io/specification/2025-11-25`), pero el **28-jul-2026** —dos
+> semanas después de este texto— se publica una versión nueva que **elimina el handshake clásico
+> `initialize`/`initialized`** y el header `Mcp-Session-Id`, moviendo a un modelo *stateless* donde
+> la metadata de sesión viaja en el `_meta` de cada request, y suma headers obligatorios
+> (`Mcp-Method`, `Mcp-Name`) para el transporte Streamable HTTP. `FastMCP` abstrae la mayor parte de
+> esto, pero si alguna vez tocás el protocolo a mano (debugging, tooling propio), no asumas que el
+> handshake de 2024 sigue vigente — revisá el changelog de `blog.modelcontextprotocol.io` primero.
 
 Un **MCP server** expone tres tipos de cosas a un cliente:
 - **Tools** — funciones que el LLM puede *invocar* (ej. `search_docs(query)` → tu RAG). Es lo que
@@ -549,7 +616,18 @@ los nombres y docstrings en base a cómo el modelo la interpreta realmente).
 En la práctica de M3, vas a revisar tu `search_docs` contra estos 5 principios antes de publicarla.
 
 ### Forma mínima (Python, sin perderte en infra)
-El SDK oficial `mcp` (con `FastMCP`) hace que exponer una tool sea casi una función decorada:
+El SDK oficial `mcp` (con `FastMCP`) hace que exponer una tool sea casi una función decorada. Ojo:
+hay **dos paquetes distintos** con el mismo nombre de clase, y ambos están migrando al mismo tiempo:
+
+- **FastMCP standalone** (PrefectHQ, `pip install fastmcp`) — llegó a 3.0 estable en feb-2026 con un
+  rediseño arquitectónico (primitivas Components/Providers/Transforms) e instrumentación
+  OpenTelemetry nativa, y ya va por la serie 3.4.x. Pineá `fastmcp>=3.4` — un quickstart de la serie
+  2.x puede tener sintaxis distinta a la actual.
+- **El SDK oficial `mcp`** (Anthropic, `pip install mcp`, el que importa el código de abajo) lanzó
+  una **v2.0 beta el 30-jun-2026** que **renombra la clase `FastMCP` incluida a `MCPServer`**, para
+  alinearse con el nuevo spec stateless que sale el 28-jul-2026. Es pre-release: si estás siguiendo
+  este curso después de esa fecha, pineá con upper bound (`mcp>=1,<2`) hasta que la v2 salga
+  estable, o vas a encontrarte con que `from mcp.server.fastmcp import FastMCP` ya no existe.
 
 ```python
 # grounded-mcp/server.py
@@ -572,6 +650,15 @@ Lo registrás en Claude Desktop (su `claude_desktop_config.json`, apuntando al c
 server) y ya podés preguntarle a Claude sobre tu doc, recuperada por *tu* pipeline. El docstring
 de la función **es** la descripción que el modelo lee para decidir cuándo llamarla — escribilo bien,
 es prompt engineering.
+
+Claude Desktop sigue siendo la implementación de referencia para probar esto sin código extra, pero
+el ecosistema de clientes MCP se diversificó bastante en 2026: **Cursor**, **Cline** (extensión
+open-source de VS Code) y **Windsurf** también descubren y llaman tools MCP. Para portfolio alcanza
+con demostrarlo en uno; mencionar que probaste tu server contra dos clientes distintos es una señal
+extra de que el contrato (no el cliente) es lo que hiciste bien. Anthropic también sumó el **Claude
+Desktop Extensions Directory** — instalación en un click de servers MCP curados por Anthropic,
+disponible en Claude.ai, Desktop, Mobile y Code — como capa de distribución más pulida que publicar
+en el registry crudo (ver `material-apoyo.md` para el link).
 
 > **Checkpoint:** ¿qué problema resuelve MCP que justifica que sea un estándar? El problema N×M:
 > sin un protocolo común, cada cliente de IA necesita una integración custom por cada herramienta

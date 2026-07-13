@@ -16,7 +16,10 @@ Esta side-quest no tiene tests de CI: el entregable es *literacy*. La prueba rea
 ## Capa 2 — defense drills (el HARD GATE)
 
 > No marcás el gate hasta responder esto **en voz alta, sin mirar**. Claude puede hacer de
-> interviewer.
+> interviewer — Sonnet 5 u Opus 4.8 sostienen mejor el rol de rol-play adversarial que un
+> modelo más liviano como Haiku. Si querés la corrida más dura posible antes de una entrevista
+> real, Claude Fable 5 es la opción más exigente disponible — pero tiene precio de frontera y es
+> overkill para este drill de rutina; Sonnet 5 u Opus 4.8 alcanzan y sobran acá.
 
 1. **"Explicame la attention como si fuera tu compañero de equipo, sin fórmulas."** — Tenés que
    llegar a Q/K/V y a la mezcla ponderada por softmax con tus palabras.

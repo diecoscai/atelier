@@ -20,6 +20,8 @@ No avances sin que el paso actual verifique.
 - Cuenta de Langfuse (cloud free tier o self-hosted vía Docker).
 - Leíste los ★ Core de `material-apoyo.md` (sobre todo Hamel #1 y #2) y podés explicar *por qué
   error analysis va primero* sin mirar.
+- Fijá versiones mínimas en tu `pyproject.toml`: `ragas>=0.4`, `deepeval>=4.0`, `langfuse>=3.0`
+  (ver `material-apoyo.md`) — el código de este módulo asume esas APIs.
 
 ---
 
@@ -101,7 +103,9 @@ significativo, no trivialmente verde).
 **Hacer:**
 - Escribí `evals/judge.py`: un judge de tu falla #1 de generación (probablemente faithfulness)
   cuyo **prompt codifica las reglas de tu taxonomía** (la estructura de la lección sección 6.1 —
-  Claude, modelo barato y separado del generador, adaptive thinking, structured output).
+  Claude, modelo barato y separado del generador, thinking, structured output). Si usás Haiku 4.5,
+  recordá que el modo de thinking es manual (`budget_tokens`, no `adaptive` — ver la nota de la
+  lección); si preferís adaptive thinking, necesitás un modelo que lo soporte.
 - **Validá el judge:** etiquetá a mano 20-30 casos (faithful / no faithful), corré el judge sobre
   esos mismos casos, y calculá el **% de acuerdo** con tus labels. Documentalo en
   `evals/judge_validation.md`.

@@ -54,6 +54,9 @@ filtra; no devuelve filas de grupos ajenos. (Documentá esto como un ADR: "filtr
 
 ## Paso 3 — PII redaction (ingesta + salida)
 **Hacer:**
+- Fijá versiones en `requirements.txt`: `presidio-analyzer>=2.2.363`, `presidio-anonymizer>=2.2.363`,
+  `spacy>=3.8,<3.9` + el modelo `es_core_news_sm` en la versión que matchea tu core de spaCy. Presidio
+  hoy es un proyecto community-owned (`data-privacy-stack`, ex-Microsoft) — mismo código, misma API.
 - `services/api/pii.py` con Presidio: `redact(text, lang)` que detecta `EMAIL_ADDRESS`,
   `PHONE_NUMBER`, `CREDIT_CARD`, `PERSON`, `IBAN_CODE` (ajustá la lista al dominio) y reemplaza por
   placeholders.
@@ -88,8 +91,10 @@ alerta, no garantiza.)
 
 ## Paso 6 — ⊕ Suite de red-team con garak (en CI)
 **Hacer:**
-- Instalá garak (`uv add garak` o el método del repo) y configurá el **generator REST** apuntando a
-  tu endpoint `/chat` de Grounded (con un JWT de tenant de prueba), en `grounded_rest.json`.
+- Instalá garak pinned (`uv add "garak==0.15.1"`, o `uv add "garak>=0.15,<0.16"` como mínimo) y
+  configurá el **generator REST** apuntando a tu endpoint `/chat` de Grounded (con un JWT de tenant
+  de prueba), en `grounded_rest.json`. Pinealo — el repo libera seguido y sin pin no hay
+  reproducibilidad entre corridas de CI.
 - Corré probes de injection/jailbreak/encoding/leak:
   ```bash
   uv run garak --model_type rest --generator_option_file grounded_rest.json \
@@ -117,9 +122,9 @@ falla. (Tests en `pruebas.md`, capa 1.)
 
 ## Paso 8 — garak vs promptfoo (decisión, no solo herramienta)
 **Hacer:** documentá en `DECISIONS.md` (ADR-0XX, `Module: M5`):
-- Por qué **garak** para el barrido adversarial amplio (familias de ataques que no querés mantener a
-  mano) y **promptfoo / pytest adversarial** para los ataques específicos de tu producto (cross-tenant,
-  citation injection).
+- Por qué **garak** (pin `0.15.1`) para el barrido adversarial amplio (familias de ataques que no
+  querés mantener a mano) y **promptfoo** (pin `>=0.121`) **/ pytest adversarial** para los ataques
+  específicos de tu producto (cross-tenant, citation injection).
 - Que ambos corren en el gate de CI de M2. La tabla comparativa de la lección §7 es tu munición.
 
 **Verificar:** el ADR existe, distingue claramente naturaleza (scanner vs framework eval+red-team) y

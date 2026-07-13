@@ -11,7 +11,7 @@ duration: ~8-10h lectura + 1 finde de práctica (GPU)
 > QLoRA lo mete en una GPU de $0; decidir con criterio **cuándo fine-tune le gana a RAG** (y por
 > qué casi siempre se combinan); leer una loss curve y detectar overfitting; y entrenar un
 > clasificador de intents con métricas reales (precision/recall/F1) para rutear barato *antes*
-> del LLM. La práctica (ver `practica.md`) es correr un QLoRA end-to-end sobre Llama-3-1B y un
+> del LLM. La práctica (ver `practica.md`) es correr un QLoRA end-to-end sobre Llama-3.2-1B y un
 > clasificador Banking77.
 
 > **Encuadre honesto:** esto es un **ejercicio de aprendizaje**, no una pieza de producción de
@@ -72,7 +72,7 @@ probabilidad al token correcto** del dataset.
 ## 3. Por qué NO full fine-tuning (el problema que LoRA resuelve)
 
 "Fine-tunear" en el sentido naive = re-entrenar **todos** los pesos del modelo con tus datos.
-Para Llama-3-1B son ~1.000 millones de parámetros; para 8B, ocho mil millones. Tres problemas
+Para Llama-3.2-1B son ~1.000 millones de parámetros; para 8B, ocho mil millones. Tres problemas
 que lo vuelven inviable para vos (y para casi cualquier empresa que no sea un lab):
 
 1. **Memoria.** Para entrenar full no alcanza con cargar el modelo. Necesitás, *además* de los
@@ -133,7 +133,7 @@ Por qué funciona (y qué defender):
 ## 5. QLoRA: meter el entrenamiento en una GPU de $0
 
 LoRA reduce los params *entrenables*, pero todavía tenés que **cargar el modelo base en VRAM**
-para hacer el forward pass. Llama-3-8B en fp16 son ~16 GB solo de pesos — no entra cómodo en una
+para hacer el forward pass. Un modelo de 8B en fp16 son ~16 GB solo de pesos — no entra cómodo en una
 T4 de 16 GB con todo lo demás. **QLoRA** (Dettmers et al., 2023, arXiv **2305.14314**) resuelve
 esto: *cuantiza el modelo base a 4 bits* y entrena los adapters LoRA encima.
 
@@ -152,11 +152,12 @@ Las tres piezas que tenés que poder nombrar (vienen del paper):
 La jugada combinada: **el modelo base, congelado, vive en 4-bit (NF4) en la GPU; los adapters
 LoRA se entrenan en precisión más alta (bf16/fp16) encima.** Como solo los adapters tienen
 gradientes/optimizador, y el grueso del modelo está en 4 bits, **un modelo de 7B entra y entrena
-en una sola GPU de consumo**. Eso es lo que vas a hacer en Colab gratis.
+en una sola GPU de consumo**. Eso es lo que vas a hacer en Colab, normalmente gratis (la GPU T4 no
+está garantizada 100% del tiempo — más en `practica.md`).
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Modelo base Llama-3  →  CONGELADO en NF4 (4-bit)   ← ocupa poca VRAM
+│  Modelo base (ej. Llama-3.2)  →  CONGELADO en NF4 (4-bit)   ← ocupa poca VRAM
 │                          │
 │                          └─► adapters LoRA (A,B) en bf16  ← lo único entrenable
 │                                  ↑ gradientes + optimizer SOLO acá
@@ -175,6 +176,16 @@ en una sola GPU de consumo**. Eso es lo que vas a hacer en Colab gratis.
 ## 6. El flujo de un fine-tune, end-to-end
 
 Esto es lo que vas a ejecutar. Internalizá el orden y el *por qué* de cada paso.
+
+> **Nota sobre versiones de modelos:** para este laburo usamos `Llama-3.2-1B-Instruct`, que ya es
+> dos generaciones vieja (Meta lanzó **Llama 4** — Scout/Maverick, arquitectura MoE — en abril
+> 2025, con Behemoth todavía entrenando). No es un error: para un ejercicio de QLoRA en una GPU de
+> 16 GB necesitás un modelo *chico y denso*, y los modelos MoE de Llama 4 (17B+ parámetros activos)
+> no entran en el presupuesto de este lab. Lo mismo aplica a las alternativas sin gate
+> (`Qwen2.5-1.5B-Instruct`/`SmolLM2-1.7B-Instruct`): fueron sucedidas por Qwen3 y SmolLM3
+> respectivamente, pero siguen siendo válidas para *aprender el mecanismo* de QLoRA — el punto del
+> módulo no es usar el SOTA, es que entiendas y hayas corrido el proceso. Verificá siempre en
+> `practica.md` qué versión de modelo/librerías está fijada antes de correr.
 
 ### 6.1. Dataset → formato de instrucción
 
@@ -212,6 +223,16 @@ Hiperparámetros que vas a ver y tener que justificar:
 - **batch size + gradient accumulation** (si no entra un batch grande en VRAM, acumulás gradientes
   de varios micro-batches antes de dar el paso — simula un batch grande sin la memoria).
 - **rank `r` y `lora_alpha`** (Sección 4).
+- **`target_modules`**: limitarlo a las proyecciones de atención (`q_proj`, `k_proj`, `v_proj`,
+  `o_proj`) es la versión de manual antigua. La práctica 2026 es sumar también las proyecciones del
+  MLP (`gate_proj`, `up_proj`, `down_proj`) — PEFT lo simplifica con el atajo
+  `target_modules="all-linear"` — porque acercarte más a *todas* las capas lineales entrenables
+  mejora notablemente qué tan cerca queda el LoRA de un full fine-tuning.
+- **DoRA** (Weight-Decomposed LoRA, `use_dora=True` en `LoraConfig`): descompone el peso en
+  magnitud + dirección y entrena ambas partes de forma más expresiva que el LoRA plano. Combinado
+  con NF4 se lo llama informalmente "QDoRA". Cuesta un poco más de cómputo; vale la pena cuando
+  tenés GPU de sobra (A100/H100) y necesitás una calidad más cercana a full fine-tuning que la que
+  da LoRA solo.
 
 ### 6.3. Loss curve: qué mirar
 
@@ -272,18 +293,27 @@ es lo que demuestra mejora. Formas de medir, de menos a más rigurosas:
 
 ### El decision framework de OpenAI (y por qué el orden importa)
 
-Antes de evaluar técnicas, el framework de la plataforma OpenAI establece un orden de prioridad
-claro que el mercado adoptó como estándar:
+Antes de evaluar técnicas, el framework que popularizó OpenAI establece un orden de prioridad
+claro que el mercado adoptó como estándar — y en 2026 se le sumó un cuarto escalón:
 
 ```
-prompting  →  RAG  →  fine-tuning
-  (horas)    (datos en   (último recurso,
-             tiempo real) con eval métrica definida)
+prompting  →  RAG  →  fine-tuning  →  distillation
+  (horas)    (datos en   (último recurso,    (una vez que ya sabés
+             tiempo real) con eval métrica   *qué* funciona, destilás
+                          definida)          esa calidad a un modelo
+                                             chico y barato de servir)
 ```
 
 **El 80% de los casos donde alguien propone un fine-tune se resuelven mejor con un prompt
 mejorado, algunos ejemplos few-shot, o un pipeline de RAG.** El fine-tuning solo entra cuando
 has agotado esas opciones y podés articular con precisión por qué no funcionaron.
+
+Este heurístico dejó de ser solo una opinión de curso: es literalmente la razón que dio **OpenAI**
+para empezar a **cerrar su plataforma self-serve de fine-tuning** (anunciado el 7-may-2026): los
+modelos base más nuevos (familia GPT-5.x, incl. GPT-5.4) siguen instrucciones tan bien que cada vez
+hay menos casos que de verdad necesiten mover pesos. Ver el recuadro de la tabla más abajo — esto
+cambia el mensaje de "fine-tuning en modelos cerrados" de "una opción más" a "una ventana que se
+está cerrando".
 
 **Regla de oro antes de abrir el notebook:**
 
@@ -303,16 +333,33 @@ fine-tunear es prematuro.
 
 No todos los modelos son fine-tuneables, y los métodos disponibles dependen del modelo:
 
-| Método | Cuándo usar | Modelos compatibles (referencia jun-2026) |
+| Método | Cuándo usar | Modelos compatibles (referencia jul-2026) |
 |---|---|---|
 | **SFT** (Supervised Fine-Tuning) | comportamiento, formato, estilo | GPT-4.1, GPT-4.1-mini |
 | **DPO** (Direct Preference Optimization) | alinear a preferencias humanas, comparativas | GPT-4.1, GPT-4.1-mini |
-| **RFT** (Reinforcement Fine-Tuning) | tareas de razonamiento que requieren "pensar" | solo reasoning models (ej. o4-mini) |
-| **No fine-tuneable** | usar vía API/prompting/RAG únicamente | GPT-5.x (modelos frontier más nuevos) |
+| **RFT** (Reinforcement Fine-Tuning) | tareas de razonamiento que requieren "pensar" | histórico: solo `o4-mini` la soportaba, y ya está en salida (ver nota abajo) |
+| **No fine-tuneable** | usar vía API/prompting/RAG únicamente | Toda la familia GPT-5.x (incl. GPT-5.4) |
 
-Awareness para entrevistas: cuando cites fine-tuning, nombra el método y verifica que el modelo
-que proponés lo soporte. "Haría fine-tuning con GPT-5" es una respuesta que delata no haber
-revisado las restricciones de la plataforma.
+> **Desarrollo crítico (verificá siempre contra `developers.openai.com/api/docs/deprecations`
+> antes de proponer esto en una entrevista o un ADR):** OpenAI anunció el **7-may-2026** el cierre
+> gradual de **toda** su plataforma self-serve de fine-tuning (SFT, DPO y RFT), en fases:
+> - desde el 7-may-2026: organizaciones **nuevas** ya no pueden iniciar fine-tuning;
+> - desde el 2-jul-2026: organizaciones **sin uso de inferencia** sobre un modelo fine-tuneado en
+>   los últimos 60 días **pierden la capacidad de crear jobs nuevos** (ya en vigencia);
+> - el 6-ene-2027: cierre total para todos. La inferencia sobre modelos ya fine-tuneados sigue
+>   funcionando hasta que se deprecien los modelos base subyacentes.
+>
+> Además, `o4-mini` —el único modelo que soportaba RFT— fue retirado de ChatGPT en feb-2026, y su
+> snapshot de API (`o4-mini-2025-04-16`) tiene shutdown programado para el **23-oct-2026**, con
+> `gpt-5.4-mini` como sucesor recomendado (que no soporta fine-tuning). En la práctica, para
+> jul-2026 **RFT ya no es una opción vigente para un proyecto nuevo** — es historia del módulo, no
+> una alternativa a evaluar.
+>
+> Awareness para entrevistas: cuando cites fine-tuning en un modelo cerrado de OpenAI, nombrá el
+> método, verificá que el modelo lo soporte, **y** mencioná que la plataforma se está cerrando por
+> decisión del propio vendor — no es una limitación técnica más, es una tendencia de mercado que
+> valida el decision framework de arriba. "Haría fine-tuning con GPT-5" sigue siendo una respuesta
+> que delata no haber revisado las restricciones de la plataforma.
 
 Esta es **la** pregunta del módulo. La respuesta mediocre es "depende". La respuesta de engineer
 tiene un eje claro:
@@ -336,6 +383,9 @@ La heurística para defender:
   último recurso cuando prompting + RAG no logran la métrica que definiste, y tenés datos
   suficientes (cientos-miles de ejemplos de calidad). Fine-tunear antes de agotar prompting es
   over-engineering que se paga con tiempo y costo sin evidencia de necesidad.
+- **El cuarto escalón, distillation:** una vez que ya validaste con fine-tuning (o con un modelo
+  grande + prompting fuerte) *qué* comportamiento querés, podés destilar esa calidad a un modelo
+  chico y barato de servir. Es el paso que viene *después*, no un sustituto de los anteriores.
 
 > **Checkpoint:** un cliente quiere que el bot "responda siempre citando el número de ticket y en
 > tono formal, usando *nuestra* base de conocimiento que actualizamos a diario". ¿Fine-tune o RAG?
@@ -366,6 +416,13 @@ Se entrena con una **contrastive loss** (típicamente con la librería **sentenc
 con `MultipleNegativesRankingLoss`): empujar los positivos cerca y los negativos lejos en el
 espacio de embeddings. El resultado: un embedder que entiende *tu* dominio → mejor recall@k → mejor
 RAG, sin tocar el LLM.
+
+Un riesgo real de este approach: si minás *hard negatives* de forma agresiva, podés terminar
+etiquetando como "negativo" un chunk que en realidad **sí** responde la query (un falso negativo),
+lo que confunde al entrenamiento. Si te pasa, la técnica más avanzada (2026) es **`GISTEmbedLoss`**:
+extiende `MultipleNegativesRankingLoss` usando un modelo guía para filtrar esos falsos negativos
+antes de penalizarlos. No hace falta para la práctica base, pero es la respuesta correcta si te
+preguntan "¿y si tu hard-negative mining te está ensuciando el training set?".
 
 > **Por qué es alta señal:** mucha gente sabe que existe el fine-tuning de LLMs; pocos saben que
 > **el retrieval también se fine-tunea**. Decir "si el recall no me alcanza con reranking, el
@@ -453,7 +510,7 @@ El trade-off precision/recall (esto es lo que diferencia):
 
 | Pieza de M9 | Dónde toca a Grounded | Nivel honesto |
 |---|---|---|
-| QLoRA sobre Llama-3-1B + Bitext | ejercicio de aprendizaje; *no* se deploya | can-build (lo corriste) + can-defend |
+| QLoRA sobre Llama-3.2-1B + Bitext | ejercicio de aprendizaje; *no* se deploya | can-build (lo corriste) + can-defend |
 | "¿cuándo fine-tune vs RAG?" | decisión de arquitectura (ADR) | can-defend-in-system-design |
 | Embedding fine-tuning de dominio | mejora *potencial* del retrieval de M3 (medible con recall@k) | can-explain + can-build (demo) |
 | Clasificador de intents (Banking77) | **router barato** antes del pipeline RAG/LLM (baja costo/latencia) | can-build + can-defend |
@@ -481,8 +538,9 @@ con tus palabras (y, donde aplica, tus números del ejercicio), el módulo no es
   prompting → RAG → fine-tune; solo cuando podés enunciar la métrica de eval que el prompting no
   mueve. (Sección 7)
 - "¿Qué método de fine-tuning usarías y en qué modelo?" → nombrar SFT/DPO/RFT según el caso, y
-  verificar que el modelo lo soporte (GPT-5.x no es fine-tuneable; RFT solo en reasoning models).
-  (Sección 7)
+  verificar que el modelo lo soporte (GPT-5.x no es fine-tuneable; RFT solo en reasoning models) —
+  y saber que OpenAI está cerrando la plataforma self-serve de fine-tuning en fases (may-2026 →
+  ene-2027), lo cual refuerza por qué prompting/RAG son el default. (Sección 7)
 
 **El drill de defensa crítico de este módulo:**
 > *"¿Cuál es la métrica de eval que no se mueve con prompting y que justifica tu propuesta de

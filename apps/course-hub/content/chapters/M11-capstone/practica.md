@@ -72,10 +72,14 @@ decisión defendida. Entregable: **2 URLs de blog posts**.
 
 ### Paso A7 — Amplificar el MCP server (señal #7)
 **Hacer:** revisá el repo del MCP server (de M3): README claro (qué expone, cómo se instala, un
-ejemplo de uso), licencia, y un GIF/clip corto. Postealo en los canales de comunidad (Sección B)
-para sumar visibilidad/stars.
-**Verificar:** el README lo entiende alguien que llega de cero, y el repo está posteado en ≥1
-canal. Entregable: **URL del repo MCP + 1 post amplificándolo**.
+ejemplo de uso), licencia, y un GIF/clip corto. Si estás ejecutando esto antes del **28-jul-2026**,
+verificá tu servidor contra la especificación MCP `2026-07-28` (release candidate ya publicado):
+cambios *breaking* incluyen protocolo stateless (sin session pinning, escalable con round-robin
+plano), "Tasks" movido de experimental-core a extensión, y la nueva "MCP Apps" (UIs HTML en
+iframe sandboxed). Actualizá el SDK si hace falta antes de amplificar. Postealo en los canales de
+comunidad (Sección B) para sumar visibilidad/stars.
+**Verificar:** el README lo entiende alguien que llega de cero, el repo funciona contra la spec
+vigente, y está posteado en ≥1 canal. Entregable: **URL del repo MCP + 1 post amplificándolo**.
 
 ### Paso A8 — Armar el sitio personal de 1 página (señal #8)
 **Hacer:** una página que sea el hub: positioning statement arriba, demo live, outcomes

@@ -49,6 +49,15 @@ distinta y un modelo de datos distinto. Hacer las dos al mismo tiempo duplica la
 bugs sin enseñarte nada nuevo. **Elegís una, la hacés bien, y la segunda es copy-paste del patrón
 cuando un cliente lo pida.** (ADR-008 — ver `practica.md`.)
 
+> **Nota de mercado (2026):** Intercom, la alternativa canónica que mencionamos arriba, está en
+> medio de una consolidación — la compañía se renombró a **Fin** en mayo de 2026 y Salesforce
+> anunció en junio la adquisición del negocio por ~US$3.6B (cierre esperado a fin de año). El
+> helpdesk sigue vendiéndose como "Intercom"; "Fin" es a la vez el nombre de la empresa y el de su
+> agente de IA. No cambia el patrón técnico de este módulo, pero es un buen argumento para el
+> "can-defend": estás construyendo *tu propia* capa de integración en vez de apostar todo a la API
+> de un solo vendor en transición — si mañana cambian términos o pricing, tu bot y tu escalation
+> logic no dependen de su roadmap.
+
 ---
 
 ## 2. Lo que M8 NO es: el marketplace listing

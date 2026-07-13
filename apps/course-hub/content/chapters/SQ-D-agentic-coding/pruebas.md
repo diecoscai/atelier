@@ -34,7 +34,9 @@ Chequeá que los siguientes archivos existen y funcionan antes de pasar a la cap
 
 2. **"¿Por qué dice Cherny que la verificación es lo más importante?"** — Articulá el loop:
    agente con mecanismo de verificación → itera → resultado excelente. Agente sin mecanismo →
-   hace un intento → para. Cita la fuente si te la piden.
+   hace un intento → para. Cita la fuente si te la piden — ya sea la frase original ("Giving
+   Claude a way to verify its work is probably the most important thing...") o la versión
+   vigente hoy en la página oficial de best practices ("Give Claude a check it can run...").
 
 3. **"¿Cuándo ponés algo en un hook y cuándo en CLAUDE.md?"** — Lo que DEBE pasar sin
    excepción (lint, format, tests) va en hook porque es determinista. Las convenciones y

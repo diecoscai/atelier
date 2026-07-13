@@ -1,12 +1,12 @@
 ---
 module: M9
-feature: QLoRA fine-tune end-to-end (Llama-3-1B + Bitext) + clasificador de intents (Banking77) como router
+feature: QLoRA fine-tune end-to-end (Llama-3.2-1B + Bitext) + clasificador de intents (Banking77) como router
 repo: grounded
 ---
 
 # Práctica — fine-tune con QLoRA + clasificador de intents (en el repo Grounded)
 
-Objetivo: **(A)** correr un QLoRA end-to-end sobre Llama-3-1B con el dataset de soporte, con loss
+Objetivo: **(A)** correr un QLoRA end-to-end sobre Llama-3.2-1B con el dataset de soporte, con loss
 curve y eval before/after que muestre mejora; **(B)** entrenar un clasificador de intents con
 Banking77, reportar F1/matriz de confusión, y conectarlo como **router barato** antes del pipeline
 RAG/LLM de Grounded. Cada paso tiene **qué hacer** y **cómo verificar**. No avances sin verificar.
@@ -17,14 +17,25 @@ RAG/LLM de Grounded. Cada paso tiene **qué hacer** y **cómo verificar**. No av
 > + README con resultados); el clasificador en `grounded/services/api/routing/`.
 
 ## Pre-requisitos
-- Cuenta de Google (Colab gratis con GPU **T4**, 16 GB) **o** ~$2 de crédito en RunPod si querés
-  una GPU más grande/rápida.
+- Cuenta de Google (Colab con GPU **T4**, 16 GB, gratis pero **no garantizada**: en horas pico
+  —14:00-18:00 UTC aprox.— Colab puede negarte runtime GPU a la cuenta gratis, degradarlo a una
+  GPU más vieja/lenta, o forzarte a CPU. Si te pasa, reintentá más tarde o usá el fallback) **o**
+  un pod en RunPod si necesitás algo más consistente: al momento de escribir esto, una RTX 4090 en
+  Community Cloud arranca en ~$0.34/h y un A40 en ~$0.35-0.44/h (billing por segundo) —
+  **verificá el precio actual en `runpod.io/pricing` antes de lanzar**, fluctúa.
 - Cuenta de Hugging Face + un **access token** (para descargar modelos/datasets gated como Llama).
-  Pedí acceso a `meta-llama/Llama-3.2-1B-Instruct` en su página de HF si está gated (es gratis,
-  tarda minutos). Alternativa sin gate: un modelo chico abierto como `Qwen/Qwen2.5-1.5B-Instruct`
-  o `HuggingFaceTB/SmolLM2-1.7B-Instruct`.
+  Pedí acceso a `meta-llama/Llama-3.2-1B-Instruct` en su página de HF si está gated (normalmente es
+  gratis y tarda minutos, aunque no siempre es instantáneo). Alternativas sin gate: un modelo chico
+  abierto como `Qwen/Qwen3-1.7B-Instruct` (sucesor de Qwen2.5) o `HuggingFaceTB/SmolLM3-3B`
+  (sucesor de SmolLM2, supera a Llama-3.2-3B y Qwen2.5-3B en benchmarks — un poco más pesado pero
+  entra igual en 4-bit en una T4).
 - Leíste los ★ Core de `material-apoyo.md` y podés explicar QLoRA y precision/recall sin mirar.
 - Python local con `uv` (para la parte B; la parte A corre en la nube).
+
+> **Sobre versiones de librerías:** `transformers`, `peft` y `trl` cambian seguido y con breaking
+> changes reales (ver Paso A0). Fijá versiones explícitas en vez de instalar "latest" a ciegas —
+> un tutorial con `pip install transformers peft trl` sin pins es el motivo #1 por el que un
+> notebook de hace 6 meses se rompe hoy.
 
 ---
 
@@ -32,14 +43,21 @@ RAG/LLM de Grounded. Cada paso tiene **qué hacer** y **cómo verificar**. No av
 
 ## Paso A0 — Setup del entorno GPU
 **Hacer:**
-- **Opción Colab (gratis):** abrí un notebook nuevo → `Runtime → Change runtime type → T4 GPU`.
-  Verificá la GPU con `!nvidia-smi`.
-- **Opción RunPod (~$2):** lanzá un pod con una GPU (ej. RTX 4090 / A40) y la plantilla de PyTorch;
-  conectate por Jupyter. Apagalo al terminar para no quemar crédito.
-- Instalá las librerías:
+- **Opción Colab (normalmente gratis):** abrí un notebook nuevo → `Runtime → Change runtime type →
+  T4 GPU`. Verificá la GPU con `!nvidia-smi`. Si Colab te niega la GPU o te da CPU (pasa en horas
+  pico), reintentá más tarde o pasá a RunPod.
+- **Opción RunPod:** lanzá un pod con una GPU (ej. RTX 4090 / A40) y la plantilla de PyTorch;
+  conectate por Jupyter. Apagalo al terminar para no quemar crédito — el billing es por segundo.
+- Instalá las librerías **con versiones fijadas** (evita romperte con breaking changes recientes de
+  Transformers v5 y TRL — ver nota de Pre-requisitos):
   ```bash
-  pip install -U transformers peft trl bitsandbytes accelerate datasets
+  pip install -U "transformers>=5.0,<6.0" "peft>=0.19.1,<0.20" "trl>=0.24,<0.25" \
+    bitsandbytes accelerate datasets
   ```
+  Verificá vos mismo las últimas versiones estables al momento de correr esto — la API de
+  `SFTTrainer`/`SFTConfig` cambió de nombre varios argumentos entre versiones (`tokenizer` →
+  `processing_class`, `max_seq_length` → `max_length`), y el código de abajo asume una versión
+  reciente de TRL.
 - Logueá a HF: `from huggingface_hub import login; login(token="hf_...")`.
 
 **Verificar:** `!nvidia-smi` muestra la T4 (o la GPU del pod). `import torch; torch.cuda.is_available()`
@@ -52,7 +70,7 @@ da `True`.
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-model_id = "meta-llama/Llama-3.2-1B-Instruct"  # o el abierto que elijas
+model_id = "meta-llama/Llama-3.2-1B-Instruct"  # o Qwen/Qwen3-1.7B-Instruct / HuggingFaceTB/SmolLM3-3B sin gate
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -127,8 +145,9 @@ peft_config = LoraConfig(
     r=16,                    # rango del adapter
     lora_alpha=32,           # escala (~2·r)
     lora_dropout=0.05,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],  # capas de atención
+    target_modules="all-linear",  # atención (q/k/v/o) + MLP (gate/up/down); mejor que solo atención
     task_type="CAUSAL_LM",
+    # use_dora=True,         # opcional: QDoRA — más expresivo, más cómputo. Bueno con GPU de sobra.
 )
 
 sft_config = SFTConfig(

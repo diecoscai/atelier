@@ -83,12 +83,19 @@ Los tipos de input que tu producto de soporte va a recibir:
 | **Tablas** | La unidad de sentido es la fila+header. Aplanarlas a texto lineal pierde la relación columna→valor. |
 | **Screenshots** (Sección 8) | Píxeles. Texto + layout visual. Vision API. |
 
-**OCR** (Optical Character Recognition) = convertir una imagen de texto en texto digital. El
-motor open-source de facto es **Tesseract**; los parsers modernos lo invocan por vos cuando
-detectan una página sin capa de texto. No necesitás operarlo a mano, pero sí saber que un PDF
-escaneado lo dispara (y que es lento y comete errores en escaneos malos).
+**OCR** (Optical Character Recognition) = convertir una imagen de texto en texto digital. Durante
+años el motor open-source por defecto fue **Tesseract**, y los parsers clásicos (Docling,
+Unstructured) todavía lo invocan por vos cuando detectan una página sin capa de texto — no
+necesitás operarlo a mano, pero sí saber que un PDF escaneado lo dispara (y que es lento en CPU
+y comete errores en escaneos malos). Ya no es "el" estándar sin discusión: **PaddleOCR** le gana
+en precisión (texto curvo, manuscrito, ruido) y en velocidad con GPU, y la tendencia de la
+industria es saltearse el pipeline clásico detector→OCR→post-proceso con **modelos
+vision-language** dedicados a documentos (Mistral OCR, Qwen2.5-VL, PaddleOCR-VL) que hacen
+doc→Markdown en un solo paso. Este curso sigue con el pipeline clásico (parser + Tesseract vía
+Docling/Unstructured) porque es más barato, corre en CPU y alcanza para el volumen de Grounded —
+pero sabé hacia dónde va la industria, porque en un system design interview puede salir.
 
-> **Checkpoint:** ¿por qué no resolvés todo con `pdfplumber`/`PyPDF2` y un `.extract_text()`?
+> **Checkpoint:** ¿por qué no resolvés todo con `pdfplumber`/`pypdf` y un `.extract_text()`?
 > Porque esos te dan un chorro de texto plano: pierden que algo era una tabla, en qué sección
 > estaba, y a veces hasta el orden de lectura en PDFs a dos columnas. Te sirven para un PDF
 > simple, pero no para docs reales con estructura. Por eso usás un parser que preserva
@@ -101,11 +108,16 @@ Las dos herramientas serias open-source para esto. No hay "la mejor"; hay trade-
 **Docling** (IBM, `github.com/docling-project/docling` — antes `DS4SD/docling`):
 - Convierte el doc a un **`DoclingDocument`** estructurado y exporta a Markdown/JSON
   preservando jerarquía, tablas y orden de lectura.
-- Fuerte en **tablas** (modelo TableFormer) y en entender layout. Pensado para alimentar RAG.
+- Fuerte en **tablas** (modelo TableFormer, en **v2** desde Docling 2.78 — marzo 2026, mejor
+  extracción y un chequeo de auto-consistencia en la estructura) y en entender layout. Pensado
+  para alimentar RAG.
 - Trae **`HybridChunker`**: un chunker que ya respeta la estructura del documento (no parte
   tablas, agrupa por sección) y es tokenizer-aware. Esto te da parse+chunk layout-aware casi
   gratis.
 - Pesa más (modelos de layout/tablas) y la primera corrida descarga modelos.
+- Es un proyecto joven con cadencia de releases muy rápida (varios releases por mes; v2.106
+  salió en junio 2026) — **pineá la versión** en tu `pyproject.toml`/lockfile, porque
+  `HybridChunker`/`TableFormer` pueden cambiar de API entre versiones menores.
 
 **Unstructured** (`github.com/Unstructured-IO/unstructured`):
 - Particiona el doc en **elementos tipados** (`Title`, `NarrativeText`, `Table`, `ListItem`,
@@ -160,9 +172,13 @@ La tensión central del chunk size:
 | Pueden cortar una idea que necesita más contexto | El embedding se "promedia", matchea peor con queries puntuales |
 | Más chunks → más filas, recall puede sufrir si la idea cruza límites | Menos chunks, pero podés meter ruido irrelevante en el prompt |
 
-No hay número mágico. Hay un número *medible* — y medirlo es M2. En M1 elegís un punto de
-partida razonable con criterio, lo dejás configurable, y lo vas a barrer contra el golden
-dataset después.
+No hay número mágico, pero en 2026 sí hay puntos de partida *medidos*: benchmarks públicos
+(Vecta/FloTorch sobre un corpus de 50 documentos reales, guías de NVIDIA) convergen en **~512
+tokens con 10-20% de overlap** como el arranque que mejor balancea precisión y contexto en
+general. Ajustá desde ahí según el tipo de query: **256-400 tokens** si son mayormente
+*factoides puntuales* (buscar un dato concreto), **512-1024** si son *analíticas/multi-hop*
+(razonar cruzando varias secciones). Esto reemplaza a "no hay evidencia" por "hay un punto de
+partida citable"; el barrido fino contra **tu** golden dataset sigue siendo M2.
 
 ### 3.1 Las cuatro estrategias (de tonta a inteligente)
 
@@ -215,17 +231,27 @@ ingesta) y más impredecible (chunks de tamaño variable, sensible al umbral). P
 **Overlap** = los chunks contiguos comparten un trozo de texto en el borde (los últimos ~100-150
 caracteres de uno son los primeros del siguiente). ¿Por qué? Para que una idea que cae justo en
 el límite no se pierda: aparece *completa* en al menos uno de los dos chunks. Regla práctica:
-**10-20% del chunk size**. Demasiado overlap = duplicás texto, inflás la base y devolvés chunks
-casi idénticos en el retrieval (redundancia). Cero overlap = riesgo de cortar la idea del borde.
-Para layout-aware el overlap importa menos (los límites ya son naturales).
+**10-20% del chunk size** — la misma franja que valida el benchmark de la sección anterior.
+Demasiado overlap = duplicás texto, inflás la base y devolvés chunks casi idénticos en el
+retrieval (redundancia). Cero overlap = riesgo de cortar la idea del borde. Para layout-aware el
+overlap importa menos (los límites ya son naturales).
+
+Tratá el 10-20% como default razonable, no como verdad revelada: un análisis de 2026 (retrieval
+SPLADE + Mistral-8B sobre Natural Questions) no encontró beneficio medible del overlap y sí más
+costo de indexación. Si vas a invertir tiempo ajustando algo, rinde más probar **late chunking**
+(embeber el documento completo y recién ahí partir, para que cada chunk retenga contexto
+anafórico — mejoras de 10-12% reportadas) o contextual retrieval (Sección de material-apoyo) que
+tocar el overlap medio punto porcentual.
 
 ### 3.3 Tokens vs caracteres
 
-Embeddings y LLMs cuentan **tokens**, no caracteres (≈1 token cada 4 caracteres en inglés, algo
-más en español). Medir el chunk en caracteres es una aproximación. Para ser preciso, medís en
-tokens con el tokenizer del modelo (`tiktoken` para OpenAI). El `HybridChunker` de Docling es
-tokenizer-aware: le pasás el tokenizer del modelo de embeddings y respeta su límite real. Esto
-importa cuando un chunk "de 800 caracteres" en realidad son 600 tokens y excedés sin querer.
+Embeddings y LLMs cuentan **tokens**, no caracteres (≈1 token cada 4 caracteres en inglés; en
+español un poco menos eficiente). Medir el chunk en caracteres es una aproximación. Para ser
+preciso, medís en tokens con el tokenizer del modelo: `tiktoken`, con el encoding `o200k_base`
+para GPT-4o y modelos posteriores (~35% más eficiente en idiomas no ingleses, español incluido,
+que el `cl100k_base` de GPT-3.5/4 clásicos). El `HybridChunker` de Docling es tokenizer-aware: le
+pasás el tokenizer del modelo de embeddings y respeta su límite real. Esto importa cuando un
+chunk "de 800 caracteres" en realidad son 600 tokens y excedés sin querer.
 
 ---
 
@@ -271,6 +297,19 @@ SELECT content FROM chunks
 WHERE source = 'facturacion.pdf'           -- filtro de metadata (barato)
 ORDER BY embedding <=> $1 LIMIT 5;          -- luego similarity
 ```
+
+> **Matiz para el ADR:** con índices **HNSW** (el default recomendado en pgvector), filtrar por
+> metadata *antes* del `ORDER BY embedding <=>` puede devolver menos de `LIMIT N` filas de las
+> esperadas si el filtro es muy selectivo, porque el índice escanea solo un subconjunto
+> aproximado del grafo. Desde pgvector 0.8.0 existe `hnsw.iterative_scan` para mitigarlo —
+> activalo si notás que te faltan resultados con filtros angostos.
+>
+> La columna `vector(N)` tiene que declarar la **dimensión exacta** que produce tu modelo de
+> embeddings (1536 para `text-embedding-3-small`, otra para otro proveedor — ver nota en
+> `practica.md` Paso 4). La mayoría de los proveedores actuales (OpenAI, Gemini, Voyage, Cohere)
+> soportan **Matryoshka Representation Learning (MRL)**: podés truncar el embedding a una
+> dimensión menor sin reentrenar nada, a cambio de algo de calidad. Es un trade-off
+> storage/precisión que vale la pena conocer aunque en M1 no lo uses.
 
 > **Checkpoint:** ¿por qué guardar `page`/`section` ahora si recién en M4 los usás?
 > Porque la metadata se captura *durante el parse* — el parser sabe en qué página y sección
@@ -319,10 +358,11 @@ Soporte recibe **capturas de pantalla** constantemente: un usuario manda un scre
 error, de una pantalla de configuración, de un mensaje. Eso es conocimiento que tu RAG debería
 poder usar, pero un screenshot es píxeles — no tiene texto para embeber.
 
-La técnica: pasás la imagen por un **modelo de visión** (GPT-4o / GPT-4V, Claude con visión) y
-le pedís que la **describa en texto** — qué muestra, qué dice el UI, qué error aparece. Esa
-descripción es texto, y al texto **sí** lo podés chunkear, embeber y guardar como un chunk más,
-con `element_type="image_caption"` y `source` = la imagen original.
+La técnica: pasás la imagen por un **modelo de visión** (familia GPT-5.x o `gpt-4o` vía API del
+lado OpenAI; Sonnet 5 / Opus 4.8 / Fable 5 con visión del lado Anthropic) y le pedís que la
+**describa en texto** — qué muestra, qué dice el UI, qué error aparece. Esa descripción es
+texto, y al texto **sí** lo podés chunkear, embeber y guardar como un chunk más, con
+`element_type="image_caption"` y `source` = la imagen original.
 
 ```python
 # pseudo-flujo: imagen -> descripción textual -> chunk normal
@@ -331,7 +371,7 @@ async def caption_image(image_b64: str) -> str:
         "Describí en detalle esta captura de un sistema de soporte: qué pantalla es, "
         "qué texto/errores aparecen, qué acción sugiere. Sé literal con los mensajes visibles."
     )
-    return await vision_call(image_b64, prompt)   # GPT-4o o Claude con visión
+    return await vision_call(image_b64, prompt)   # modelo de visión vigente (GPT-5.x/gpt-4o o Claude)
 ```
 
 Decisiones que esto trae:
@@ -339,13 +379,20 @@ Decisiones que esto trae:
   puede bastar y es más barato. Si importa el *layout/significado visual* (dónde está el botón,
   qué pantalla es), vision describe mejor. A menudo: ambos — OCR para el texto literal + vision
   para el contexto.
-- **Costo.** Vision es caro comparado con embeddings (`3-small` cuesta centavos; una llamada
-  vision por imagen, no). Por eso lo corrés **una vez en la ingesta** y guardás la descripción,
-  no en cada query.
+- **Costo.** Vision sigue siendo caro comparado con embeddings: `text-embedding-3-small` de
+  OpenAI cuesta centavos por millón de tokens (~$0.02/1M estándar, la mitad en batch), mientras
+  que una sola llamada de visión por imagen es órdenes de magnitud más cara. La brecha se
+  mantiene aunque los nombres de los modelos cambien — por eso corrés vision **una vez en la
+  ingesta** y guardás la descripción, no en cada query.
 - **Multimodal embeddings (awareness).** Existen modelos que embeben imagen y texto en el mismo
-  espacio (CLIP, `voyage-multimodal`) para buscar imágenes directo. Es una alternativa al
-  patrón "describir y embeber el texto". Para Grounded el patrón caption→texto es más simple y
-  reusa todo tu pipeline; mencionás los embeddings multimodales como camino que conocés.
+  espacio para buscar imágenes directo, sin pasar por una descripción textual. **CLIP** (2021)
+  es la referencia histórica/didáctica: dos encoders separados (imagen, texto) proyectados al
+  mismo espacio. Los modelos actuales van más allá: `voyage-multimodal-3.5` (enero 2026) usa un
+  único transformer que procesa texto e imagen intercalados (documentos, screenshots, tablas,
+  incluso video) en vez de encoders separados estilo CLIP. Es una alternativa real al patrón
+  "describir y embeber el texto". Para Grounded el patrón caption→texto sigue siendo más simple
+  y reusa todo tu pipeline de texto; mencionás los embeddings multimodales como camino que
+  conocés y evaluarías si el volumen de imágenes creciera mucho.
 
 > **Checkpoint:** ¿por qué describís la imagen en la ingesta y no en la query?
 > Porque la query trae *texto* ("¿qué significa el error X?") y vos querés matchearlo contra el

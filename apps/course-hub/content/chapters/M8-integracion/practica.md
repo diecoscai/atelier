@@ -17,22 +17,38 @@ tiene **qué hacer** y **cómo verificar**. No avances al siguiente sin que el a
 - M4 cerrado: tenés RAG con citations, "no sé" calibrado y confidence (logprobs). M8 lo *usa*.
 - M2 cerrado: tenés el harness de evals + golden dataset. Lo vas a reusar para medir calidad.
 - Una cuenta **Zendesk trial** (gratis) o Intercom. Esta guía usa Zendesk.
-- `ngrok` (o `cloudflared`) para exponer tu endpoint local.
+- `ngrok` (o `cloudflared`) para exponer tu endpoint local. Si tu sesión de práctica dura más de 2h,
+  usá `cloudflared` — el free tier de `ngrok` desde feb-2026 corta la sesión a las 2 horas y muestra
+  una warning page en tráfico HTML (agregá el header `ngrok-skip-browser-warning: true` si te quedás
+  con ngrok, ver `material-apoyo.md`).
 - Leíste los ★ Core 1-3 de `material-apoyo.md` y entendés trigger → webhook → comentario.
 
 ---
 
 ## Paso 1 — Sandbox + tickets sintéticos
 **Hacer:**
-- Creá una cuenta Zendesk trial. Generá un **API token** (Admin → Apps and integrations → APIs →
-  Zendesk API → Token access). Guardalo en `.env` como `ZENDESK_API_TOKEN` + `ZENDESK_SUBDOMAIN` +
-  `ZENDESK_EMAIL`.
+- Creá una cuenta Zendesk trial.
+- **⚠ Autenticación — leé esto antes de generar credenciales.** Zendesk está eliminando los API
+  tokens como método de auth, en tres fases: tokens sin uso 30+ días se desactivan solos **desde el
+  28-jul-2026**, no se pueden crear tokens nuevos **desde el 27-oct-2026**, y todos dejan de andar
+  **el 30-abr-2027** (ver `material-apoyo.md`, Referencia). Dos caminos:
+  - **API token (rápido, pero con vencimiento a la vista):** Admin Center → Apps and integrations →
+    APIs → **API configuration** (activá "Allow API token access") y después APIs → **API tokens**
+    → "Add API token". Guardalo en `.env` como `ZENDESK_API_TOKEN` + `ZENDESK_SUBDOMAIN` +
+    `ZENDESK_EMAIL`, y **usalo dentro de los primeros 30 días** o Zendesk lo desactiva solo por
+    inactividad. (No hay un menú llamado "Zendesk API → Token access" en la UI actual — son dos
+    pestañas separadas, configuration y tokens.)
+  - **OAuth (recomendado, sin fecha de vencimiento):** Admin Center → Apps and integrations → APIs →
+    **OAuth Clients** → creá un cliente y usá **client credentials grant** para conseguir un bearer
+    token. Guardalo como `ZENDESK_OAUTH_TOKEN`. Es más setup inicial, pero es el método que Zendesk
+    sostiene a largo plazo — si tu cuenta trial es nueva, arrancá directo por acá.
 - Cargá **8-12 tickets sintéticos** que cubran los casos que necesitás testear: unos cubiertos por
   tu doc (el bot debería resolver), unos no cubiertos (debería decir "no sé" → escalar), y al menos
   uno sensible (tag `billing` o `refund` → escala por regla dura).
 
 **Verificar:** desde tu API podés listar tickets vía
-`GET https://{subdomain}.zendesk.com/api/v2/tickets.json` con el token y ves tus tickets sintéticos.
+`GET https://{subdomain}.zendesk.com/api/v2/tickets.json` con el token (o el bearer token OAuth en el
+header `Authorization`) y ves tus tickets sintéticos.
 
 ## Paso 2 — Webhook receiver con verificación de firma
 **Hacer:** endpoint `POST /integrations/zendesk/webhook` en FastAPI que:
@@ -86,7 +102,8 @@ async def post_comment(ticket_id: int, body: str, public: bool, solve: bool):
     payload = {"ticket": {"comment": {"body": body, "public": public}}}
     if solve:
         payload["ticket"]["status"] = "solved"
-    # PUT .../api/v2/tickets/{ticket_id}.json con auth {email}/token:{api_token}
+    # PUT .../api/v2/tickets/{ticket_id}.json
+    # auth: {email}/token:{api_token} (Basic) o Authorization: Bearer {oauth_token} — ver Paso 1
     await _put(f"/api/v2/tickets/{ticket_id}.json", payload)
 ```
 

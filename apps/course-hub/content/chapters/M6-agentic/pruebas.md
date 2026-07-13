@@ -62,9 +62,10 @@ gate: pending
    static, retrieve JIT, isolate per task, compress history) + las palancas de implementación
    (selección, orden, compresión, budget). Por qué más contexto puede empeorar el resultado.
 
-8. **"¿Cómo adaptás RAG para un reasoning model (o3 / extended thinking / Gemini 2.5)?"** —
-   System 1 vs System 2. Por qué inyectar chunks antes de que razone **cortocircuita** su mejor
-   capacidad. Tu adaptación: retrieval-as-tool, recuperar más grueso, rutear por modelo.
+8. **"¿Cómo adaptás RAG para un modelo con razonamiento adaptativo (`effort` alto en Claude,
+   GPT-5.x, Gemini 3)?"** — System 1 vs System 2. Por qué inyectar chunks antes de que razone
+   **cortocircuita** su mejor capacidad. Tu adaptación: retrieval-as-tool, recuperar más grueso,
+   rutear el nivel de esfuerzo por query.
 
 9. **"Mostrame tu grafo. ¿Cómo evitás un agente fuera de control?"** — Routing + `MAX_HOPS` +
    estado acotado. El failure mode (loop infinito / costo runaway) y tu red de seguridad.

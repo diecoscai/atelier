@@ -41,8 +41,9 @@ Al terminar M2 tenés que poder, en el nivel honesto indicado. Este es el módul
 - **(can-defend)** Los sesgos del LLM-judge (position bias, verbosity bias, self-preference,
   sycophancy) y cómo los mitigás.
 - **(can-defend)** **SME alignment**: por qué un judge sin validar es vibes-based, y cómo medís
-  el acuerdo con **Cohen's Kappa (κ)**. Defendé tu kappa: qué nivel alcanzaste, dónde discrepa el
-  judge con tu criterio humano, y qué ajustes hiciste al prompt. κ < 0.40 → el judge no está listo.
+  el acuerdo con **Cohen's Kappa (κ)** (rangos de interpretación de Landis & Koch, 1977). Defendé
+  tu kappa: qué nivel alcanzaste, dónde discrepa el judge con tu criterio humano, y qué ajustes
+  hiciste al prompt. κ < 0.40 → el judge no está listo.
 - **(can-defend)** **Evaluation flywheel**: el loop continuo medir → identificar fallas → mejorar
   componentes → re-medir, y cómo el CI gate es el punto de control de ese loop.
 - **(can-defend)** Por qué el modelo del judge es barato (corre en cada commit) y separado del de

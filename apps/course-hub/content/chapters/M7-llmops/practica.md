@@ -28,8 +28,8 @@ comparativa. Cada paso tiene **qué hacer** y **cómo verificar**. No avances si
 **Hacer:**
 - Instrumentá Langfuse en el endpoint `/chat` (decorator `@observe` + wrapper `langfuse.openai`).
   Pasá `metadata` con `tenant_id` y `prompt_version` (empezá en `"v1"`).
-- Corré el golden dataset de M2 una vez con el sistema **tal cual está hoy** (todo a `gpt-4o`, sin
-  routing, sin cache, sin budget).
+- Corré el golden dataset de M2 una vez con el sistema **tal cual está hoy** (todo al modelo
+  frontier — `MODEL_FRONTIER`, ej. `gpt-5.6-sol` a julio 2026 — sin routing, sin cache, sin budget).
 
 **Verificar:** en el dashboard de Langfuse ves, para esa corrida: **costo total**, **costo por
 conversación promedio**, **tokens** (input/output) y **TTFT / p50 / p95**. Anotá estos números —
@@ -37,9 +37,12 @@ son tu baseline. Sin baseline, "bajé el costo" no tiene contra qué.
 
 ## Paso 1 — Model routing por complejidad
 **Hacer:**
-- `routeQuery(query)` en el BFF (`apps/web/lib/router.ts`): clasificador con `gpt-4o-mini` que
-  devuelve `simple | complex` en structured output (ver lección §2).
-- `pickModel(complexity)`: `simple → gpt-4o-mini`, `complex → gpt-4o`.
+- `routeQuery(query)` en el BFF (`apps/web/lib/router.ts`): clasificador con `MODEL_CHEAP` (el
+  tier barato vigente del proveedor, ej. `gpt-5.6-luna`) que devuelve `simple | complex` en
+  structured output (ver lección §2).
+- `pickModel(complexity)`: `simple → MODEL_CHEAP`, `complex → MODEL_FRONTIER`. Nunca hardcodees el
+  nombre del modelo — el proveedor lo retira o renombra antes de que termines el curso (ya pasó con
+  `gpt-4o`, ver lección §6).
 - Enchufá el router antes de la generación en `/chat`.
 
 **Verificar:**
@@ -52,7 +55,7 @@ son tu baseline. Sin baseline, "bajé el costo" no tiene contra qué.
 ## Paso 2 — Token / context budgets
 **Hacer:**
 - `count_tokens` con `tiktoken` y `fit_chunks_to_budget(chunks, tier)` (`services/api/budget.py`,
-  ver lección §4). Los chunks vienen ya rankeados del rerank de M3; cortás por budget desde el final.
+  ver lección §5). Los chunks vienen ya rankeados del rerank de M3; cortás por budget desde el final.
 - Aplicá `CONTEXT_BUDGET` por tier antes de armar el prompt. Cap de `max_tokens` en el output.
   Truncá el historial a los últimos N turnos.
 
@@ -65,7 +68,7 @@ son tu baseline. Sin baseline, "bajé el costo" no tiene contra qué.
 ## Paso 3 — Semantic cache (sobre pgvector, por tenant)
 **Hacer:**
 - Tabla `semantic_cache` con `tenant_id`, `query_embedding vector(1536)`, `response`, índice HNSW
-  (ver lección §3).
+  (ver lección §4).
 - `cache_lookup(db, tenant_id, query)`: embebe la query, busca el vecino más cercano **del mismo
   tenant**, devuelve la respuesta si `similarity >= SIMILARITY_THRESHOLD` (arrancá en 0.95).
 - `cache_store(...)` al final del camino de miss. Enchufá: lookup antes del LLM, store después.
@@ -99,9 +102,10 @@ job de drift corre y produce un resultado (verde) que podés enseñar.
 
 ## Paso 6 — ⊕ Graft open-source: swap a Ollama y comparar
 **Hacer:**
-- `ollama pull llama3.1:8b` (y opcional `mistral`). Cliente `AsyncOpenAI` con
-  `base_url="http://localhost:11434/v1"` (`services/api/llm_local.py`, ver lección §7).
-- Corré el golden set de M2 **con Llama 3.1 8B local** exactamente como lo corriste con OpenAI.
+- `ollama pull qwen3:8b` (opcional comparar contra `llama3.2:3b`, `gemma3:4b` o `phi4-mini`).
+  Cliente `AsyncOpenAI` con `base_url="http://localhost:11434/v1"` (`services/api/llm_local.py`,
+  ver lección §8).
+- Corré el golden set de M2 **con Qwen3 8B local** exactamente como lo corriste con OpenAI.
 - Armá la **tabla comparativa** de 3 ejes (costo / calidad / latencia-TTFT) + privacidad + operación.
 
 **Verificar:** swappear te tomó cambiar `base_url` y el nombre del modelo (no reescribiste el

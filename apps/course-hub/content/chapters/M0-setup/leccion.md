@@ -102,8 +102,12 @@ Detalles que vas a tener que defender:
 - **Dimensiones:** `text-embedding-3-small` = 1536 dims; `3-large` = 3072. Más dims ≈ más
   expresivo pero más caro de guardar/buscar. `3-small` soporta reducir dims (parámetro
   `dimensions`) con poca pérdida.
-- **Costo:** los embeddings son baratísimos (~$0.02 por 1M de tokens con `3-small`). Embeber
-  toda tu doc cuesta centavos. Lo caro es el LLM de generación.
+- **Costo:** los embeddings son baratísimos (~$0.02 por 1M de tokens con `3-small`; con Batch
+  API, la mitad: ~$0.01 por 1M). Embeber toda tu doc cuesta centavos. Lo caro es el LLM de
+  generación. Ojo: la página oficial de cada modelo de embeddings en OpenAI ya no lidera con
+  "$/1M tokens" — muestra primero una métrica de "páginas por dólar" (para `3-small`, del orden
+  de decenas de miles de páginas por dólar). Es el mismo precio, comunicado distinto; no te
+  confundas si ves esa unidad en vez de la que usamos acá.
 - **Determinismo:** el mismo texto da (casi) el mismo vector siempre. Por eso podés cachear.
 
 ---
@@ -113,6 +117,19 @@ Detalles que vas a tener que defender:
 Una base vectorial guarda vectores y resuelve la pregunta *"dame los k vectores más cercanos a
 este"* rápido. Hay productos dedicados (Qdrant, Pinecone, Weaviate), pero **arrancamos con
 pgvector**: una extensión de PostgreSQL que agrega un tipo de dato `vector`.
+
+A escala, la diferencia de costo y de modelo de pricing entre estas opciones es real y vale la
+pena conocerla (no para elegir ahora — para poder justificar *cuándo* migrarías):
+
+| Vector DB | ~10M vectores | ~100M vectores | Cómo cobra | Hybrid search nativo |
+|---|---|---|---|---|
+| **pgvector** | ~gratis (ya pagás Postgres) | <$100/mes (self-hosted) | infra que ya tenés | no (lo componés a mano) |
+| **Qdrant** | ~$65/mes | crece con RAM/CPU/disco | recursos reservados | sí |
+| **Pinecone** | ~$70/mes | $700+/mes (Serverless) | storage + queries + writes | sí |
+| **Weaviate** | ~$135/mes | crece con RAM/CPU/disco + dims almacenadas | recursos + ~$0.095 por millón de dimensiones/mes (tier compartido) | sí |
+
+La brecha se nota poco a 10M vectores y se dispara a 100M+. Esa es, en números, la razón por la
+que "migrás cuando medís que lo necesitás" (más abajo) no es una frase vacía.
 
 ```sql
 CREATE EXTENSION vector;

@@ -8,10 +8,13 @@ Al terminar M3 tenés que poder, en el nivel honesto indicado:
 
 - **(can-explain)** Qué es **context engineering** y por qué reemplazó a "prompt engineering" como
   la disciplina central: el foco pasó de "qué le decís al modelo" a "qué información le das, en qué
-  formato y cuándo". Atribución: Karpathy (25-jun-2025, *"the delicate art and science of filling
-  the context window with the right information in the right format at the right time"*), Lütke
-  (primera referencia viral, 19-jun-2025), Jason Liu (marco aplicado a RAG desde ago-2025), Gartner
-  (*"context engineering is in, prompt engineering is out"*, mid-2025).
+  formato y cuándo". Atribución completa (con el matiz que suele faltar): Walden Yan (Cognition)
+  escribía sobre esto antes de que se viralizara; Lütke lo tuiteó y lo hizo viral (19-jun-2025);
+  Karpathy lo formalizó seis días después (25-jun-2025, *"the delicate art and science of filling
+  the context window with the right information in the right format at the right time"*); Jason
+  Liu desarrolló el marco aplicado a RAG desde ago-2025; Gartner lo hizo mainstream con
+  *"context engineering is in, prompt engineering is out"* (jul-2025) y siguió declarando 2026
+  *"the year of context"*.
 - **(can-explain)** Por qué el retrieval dense-only falla en casos exactos (códigos de error,
   SKUs, nombres propios, versiones) y por qué sparse (BM25) los recupera — con ejemplos de *tu*
   dominio de soporte, no genéricos.
@@ -41,7 +44,10 @@ Al terminar M3 tenés que poder, en el nivel honesto indicado:
   ya descriptivas, out-of-domain donde HyDE alucina mal, costo/latencia que no compensa — y que la
   decisión la tomaste *midiendo*, no por intuición.
 - **(can-defend-in-system-design)** Cohere rerank vs cross-encoder self-hosted: el trade-off
-  (infra/costo/privacidad/latencia) y en qué punto migrarías.
+  (infra/costo/privacidad/latencia) y en qué punto migrarías. Sabés qué versión de Cohere Rerank
+  estás usando y por qué (Rerank 4 — `v4.0-fast`/`v4.0-pro` — reemplazó a `v3.5`, que deja de
+  recibir tráfico el 1-ago-2026) y podés nombrar al menos una alternativa self-hosted más allá de
+  `bge-reranker-v2-m3` (Qwen3-Reranker, Jina v2, ZeroEntropy) si te preguntan por el panorama 2026.
 - **(can-defend-in-system-design)** Las **decisiones de tool design** de tu MCP server contra los 5
   principios de Anthropic Engineering: **high leverage** (qué capacidad agentiva real da la tool),
   **clear namespacing** (por qué el nombre elegido), **human-readable outputs** (formato del
@@ -49,8 +55,15 @@ Al terminar M3 tenés que poder, en el nivel honesto indicado:
   típica y cómo lo controlás), **documentación clara** (el docstring como contrato, no como
   comentario). Leíste el ADR de tool design y podés defenderlo.
 - **(awareness)** Metadata-rich retrieval para agentes (Jason Liu): devolver facets (conteos,
-  categorías) para que el agente pueda refinar consultas, no solo chunks de texto.
+  categorías) para que el agente pueda refinar consultas, no solo chunks de texto. Awareness del
+  desarrollo posterior ("agent peripheral vision"): dar señal sobre el espacio de información más
+  allá del top-k, no solo sobre lo que ya trajiste.
 - **(awareness)** Qué es DSPy y qué problema ataca (optimización programática de prompts vs
-  hand-tuning), cómo se relaciona con tu harness, y cuándo lo considerarías. No need to build.
+  hand-tuning), cómo se relaciona con tu harness, y cuándo lo considerarías. No need to build. Sabés
+  que en 2026 dejó de ser un experimento académico chico (34k+ stars, ~160K descargas/mes) y que su
+  optimizer central hoy es **GEPA**.
 - **(awareness/can-explain)** Qué es MCP y por qué se volvió estándar (el problema N×M, "USB-C de
-  la IA"), Tools/Resources/Prompts, y por qué exponer el RAG así es señal de mercado.
+  la IA"), Tools/Resources/Prompts, y por qué exponer el RAG así es señal de mercado. Sabés que la
+  spec no está congelada: la revisión del 28-jul-2026 mueve el protocolo a un modelo *stateless*
+  (elimina el handshake `initialize`/`initialized`) — no necesitás el detalle para defender el
+  módulo, pero sí saber que existe si te preguntan "¿y si cambia el protocolo?".

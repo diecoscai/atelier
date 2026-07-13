@@ -63,8 +63,10 @@ su chunk correcto en el top-60 — hybrid tapó los dos huecos.
 
 ## Paso 3 — Cross-encoder rerank: de 60 candidatos a top-5
 **Hacer:**
-1. Tomá los ~60 candidatos de `hybrid_search` y pasalos por **Cohere Rerank** (`rerank-v3.5`):
-   mandás `query` + los 60 `documents`, recibís los reordenados con `relevance_score`.
+1. Tomá los ~60 candidatos de `hybrid_search` y pasalos por **Cohere Rerank** (`rerank-v4.0-fast`
+   para arrancar barato, o `rerank-v4.0-pro` si necesitás la ventana de 32K tokens o mejor calidad
+   multilingüe — **no uses `rerank-v3.5`**, deja de recibir tráfico el 1-ago-2026): mandás `query` +
+   los 60 `documents`, recibís los reordenados con `relevance_score`.
 2. Quedate con el **top-5/20** reordenado. Exponé el core final del módulo:
    `hybrid_search_rerank(query, top_k=5) -> list[chunk]`.
 3. Conectá `/chat` a esta función (reemplaza el dense-only de M0; el contrato del endpoint no
@@ -108,7 +110,9 @@ no-regresión.)
    (`hybrid_search_rerank` de los pasos 2-3). No dupliques lógica — el MCP server y el `/chat`
    llaman al mismo core.
 2. Con el SDK `mcp` (`FastMCP`), exponé `search_docs(query, top_k=5)` como `@mcp.tool()` (ver
-   código de §9). Docstring claro: es lo que el modelo lee para decidir cuándo llamarla.
+   código de §9). Docstring claro: es lo que el modelo lee para decidir cuándo llamarla. Pineá la
+   versión (`mcp>=1,<2` o `fastmcp>=3.4` según cuál uses — ver §9 sobre la migración en curso a
+   `MCPServer`/spec stateless) para no romperte con un release nuevo a mitad de la práctica.
 3. Registralo en **Claude Desktop** (su `claude_desktop_config.json`) apuntando al comando que corre
    tu server por stdio.
 4. README del repo MCP: qué hace, cómo instalarlo, un GIF de Claude Desktop usándolo. Publicalo en

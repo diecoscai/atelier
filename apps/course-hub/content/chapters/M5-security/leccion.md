@@ -68,11 +68,15 @@ defensa de M5.
 > prompt no le saca al agente el acceso a datos ni la capacidad de comunicación externa. Lo único
 > que resuelve es diseño de sistema: no darle al agente capacidades que no necesita.
 
-### Agents Rule of Two (nov-2025)
+### Agents Rule of Two (oct-2025)
 
 Inspirado en el "Rule of 2" de la seguridad de Chrome (ningún componente tiene más de 2 de:
-unsafe input, unsafe memory, high privilege), Willison formalizó en nov-2025 ("New prompt injection
-papers: Agents Rule of Two and The Attacker Moves Second", simonwillison.net):
+unsafe input, unsafe memory, high privilege), **Meta AI** publicó el paper "Agents Rule of Two"
+(31-oct-2025, Meta AI blog). Willison lo resume junto con el paper hermano "The Attacker Moves
+Second" (colaboración OpenAI/Anthropic/Google DeepMind, arXiv, 10-oct-2025) en su post del
+2-nov-2025 ("New prompt injection papers: Agents Rule of Two and The Attacker Moves Second",
+simonwillison.net) — **la autoría del Rule of Two es de Meta AI, no de Willison**; su aporte fue
+divulgarlo y conectarlo con la lethal trifecta:
 
 **Un agente no debe tener más de 2 de las 3 propiedades riesgosas de la trifecta.**
 
@@ -80,7 +84,7 @@ Es la versión operativa de la trifecta: no es un principio binario ("¿seguro o
 un criterio de diseño que te dice cuándo un sistema es exfiltrable por construcción. Si tu agente
 tiene las tres, hay que quitar una antes de deployarlo.
 
-### Ataques reales documentados en 2025
+### Ataques reales documentados (2025-2026)
 
 No es teoría. Estos sucedieron:
 
@@ -94,9 +98,60 @@ No es teoría. Estos sucedieron:
   a través de contenido procesado por el agente (issues de GitHub, comentarios, archivos) que
   exfiltraba datos o ejecutaba acciones no autorizadas.
 
+- **LiteLLM supply-chain compromise (mar-2026):** un backdoor (`hackerbot-claw`) vivió ~3h en PyPI
+  con ~47.000 descargas antes de ser retirado, afectando el gateway LLM que usan frameworks de
+  agentes como CrewAI, DSPy y Microsoft GraphRAG. No es prompt injection — es supply-chain, pero el
+  resultado (acceso privilegiado + comunicación externa no auditada) es el mismo riesgo de fondo.
+
+- **postmark-mcp — el primer servidor MCP malicioso documentado en el wild:** publicó 15 versiones
+  limpias antes de inyectar código de exfiltración. Ilustra que la superficie de ataque de un MCP
+  server no es solo "qué prompt le mandan": es también su cadena de supply-chain.
+
+- **"Poisoned MCP tool descriptions" (Microsoft Security Blog, 30-jun-2026):** Microsoft documentó
+  cómo las *descripciones* de las tools de un MCP server (no solo su output) pueden llevar
+  instrucciones ocultas que el agente lee al decidir qué tool llamar, filtrando datos en producción.
+  Vector nuevo: el envenenamiento no está en el contenido recuperado sino en los metadatos de la
+  tool misma.
+
+- **MCP "by design" RCE — CVE-2026-30623 y relacionados ("Mother of All AI Supply Chains",
+  OX Security, abr-2026):** un fallo arquitectónico en los SDKs oficiales de MCP (Python, TypeScript,
+  Java, Rust) vía el transporte `stdio` que permite ejecución remota de código, con más de 150M de
+  descargas afectadas y hasta ~200.000 instancias expuestas estimadas. Lo que lo vuelve un caso
+  citable en entrevista: **Anthropic confirmó que el comportamiento es "by design" y no parcheó el
+  protocolo** — solo actualizó la documentación. Precedente directo para el MCP server que
+  construiste en M3: la industria no espera un fix de protocolo, mitiga con gateways externos y
+  sandboxing del proceso que corre el server.
+
+- **"GitLost" (Noma Security, divulgado 7-jul-2026):** un GitHub Issue público, con el contenido
+  malicioso precedido de un único prefijo ("Additionally"), logró bypassear los guardrails de
+  GitHub Agentic Workflows y filtrar el contenido de un README privado. Ejemplo textbook y muy
+  reciente de la lethal trifecta: datos privados (el README) + contenido no confiable (el Issue
+  público, que cualquiera puede escribir) + canal de salida (el propio workflow que responde en
+  público). Vale citarlo por lo simple que fue el payload: una palabra de más alcanzó.
+
+Una encuesta de 2026 (citada por OWASP GenAI) reporta que el **88% de las organizaciones** tuvieron
+incidentes de seguridad de agentes AI confirmados o sospechados en el último año, y que la
+injection indirecta (vía contenido recuperado) sigue siendo la causa dominante en producción.
+
 El **MCP server que construiste en M3 ES una superficie de ataque**. Antes de publicarlo, analizá:
 ¿cuántas patas de la trifecta tiene tu sistema cuando un agente lo usa? ¿Qué restricciones de
-scope le pusiste a las tools para limitar la capacidad de comunicación externa?
+scope le pusiste a las tools para limitar la capacidad de comunicación externa? ¿Confiás en las
+tools que declara el server, o también auditás su descripción y su cadena de supply-chain?
+
+### La tendencia 2026: cortar una pata sin depender del LLM
+
+Willison siguió documentando exfiltraciones en vendors mainstream durante 2026 — no solo demos de
+investigación —: **Google Antigravity** (25-nov-2025, instrucciones ocultas en texto de 1px que
+manipulan a Gemini para exfiltrar credenciales vía subagentes de browser) y **Microsoft Copilot
+Cowork** (26-may-2026, exfiltración vía imágenes embebidas que disparan requests de red externos).
+El patrón se repite: el trifecta sigue siendo el marco de referencia dominante.
+
+La mitigación que está ganando tracción en la industria no es "mejor prompt de seguridad", es
+**cortar una pata de forma determinística, sin que el LLM tenga que evaluar nada**. Ejemplo:
+**OpenAI Lockdown Mode** (jun-2026) restringe los *outbound network requests* a nivel de
+infraestructura — no le pide al modelo que decida si una request es sospechosa, se la saca
+directamente. Es el mismo principio que este curso ya enseña con el aislamiento en SQL: la defensa
+que aguanta no evalúa con el LLM, se lo saca de la ecuación.
 
 ### Escepticismo de guardrails de vendors
 
@@ -144,11 +199,12 @@ M5 es construir esa frontera y después *atacarla* para probar que aguanta.
 
 ---
 
-## 2. El modelo de amenazas: OWASP Top 10 para LLM Apps
+## 2. El modelo de amenazas: OWASP Top 10 para LLM Apps (y su hermano para agentes)
 
 Antes de defender, nombrá lo que defendés. El **OWASP Top 10 for LLM Applications** es la lista
-canónica de riesgos de apps con LLM — la que un entrevistador espera que conozcas por su ID. Las que
-tocan a un RAG de soporte, y que este módulo ataca:
+canónica de riesgos de apps con LLM — la que un entrevistador espera que conozcas por su ID. La
+lista completa tiene **10 riesgos, LLM01 a LLM10**; los que tocan a un RAG de soporte, y que este
+módulo ataca, son estos cinco:
 
 | ID | Nombre exacto | Cómo se manifiesta en Grounded | Dónde lo atacamos |
 |---|---|---|---|
@@ -158,12 +214,33 @@ tocan a un RAG de soporte, y que este módulo ataca:
 | **LLM08** | **Vector & Embedding Weaknesses** | Cross-tenant leakage por filtro débil; poisoning del índice; recuperar lo que no corresponde | §6, §7 |
 | **LLM09** | **Misinformation** | El sistema afirma con confianza algo falso o inyectado por un doc envenenado | §5, conecta con trust de M4 |
 
+El riesgo restante que no ataca este módulo pero conviene poder nombrar: **LLM10 Unbounded
+Consumption** — un atacante agota recursos (tokens, cómputo, costo de API) sin límites de rate/
+budget. No es foco de M5, pero es fácil de citar si te preguntan por la lista completa.
+
 > **Cómo citar en entrevista:** siempre ID + nombre exacto. "LLM01 — Prompt Injection", no solo
 > "prompt injection". La entrevista de seguridad evalúa si conocés el marco, no solo el concepto.
 >
-> **Nota de versión:** OWASP renumeró la lista entre 2023 y la edición 2025. Los IDs de arriba son
-> los de la edición vigente (2025). El que más vas a citar es **LLM01 (Prompt Injection)** — fue el
-> #1 en ambas ediciones, precisamente porque no hay un parche que lo cierre del todo.
+> **Nota de versión:** la edición 2025 (v2.0, 12-mar-2025) **sigue siendo la vigente** para el LLM
+> Top 10 a jul-2026 — no hubo renumeración ni edición 2026 de esta lista. El que más vas a citar es
+> **LLM01 (Prompt Injection)** — fue el #1 en 2023 y en 2025, precisamente porque no hay un parche
+> que lo cierre del todo.
+
+### El hermano nuevo: OWASP Top 10 for Agentic Applications 2026 (ASI01-ASI10)
+
+Lo que sí es nuevo: el 9-dic-2025 el OWASP GenAI Security Project publicó un documento **hermano**,
+no un reemplazo — el **OWASP Top 10 for Agentic Applications 2026**, con su propia numeración
+`ASI01`-`ASI10` específica para riesgos de agentes con herramientas/memoria/multi-agente: Agent
+Goal Hijack, Tool Misuse & Exploitation, Agent Identity & Privilege Abuse, Agentic Supply Chain
+Compromise, Unexpected Code Execution, Memory & Context Poisoning, Insecure Inter-Agent
+Communication, Cascading Agent Failures, Human-Agent Trust Exploitation, Rogue Agents.
+
+Son **dos listas distintas que coexisten**, no una renumeración de la misma: el **LLM Top 10**
+describe riesgos del modelo/app (lo que ataca este módulo), el **ASI Top 10** describe riesgos del
+comportamiento agéntico (lo que vas a atacar en M6). El MCP server de M3 y los ataques de supply
+chain de §0 (LiteLLM, postmark-mcp) son ejemplos de **ASI04 Agentic Supply Chain Compromise** y
+**ASI06 Memory & Context Poisoning** — vale la pena poder nombrar el ID correcto de cada framework
+sin confundirlos en una entrevista.
 
 > **Checkpoint:** ¿por qué prompt injection es LLM01 y no un bug que se arregla con un mejor prompt?
 > Porque el LLM no distingue *estructuralmente* entre tus instrucciones y el texto que le llega: para
@@ -197,9 +274,17 @@ seguridad.** Ambos, no uno.
 ### Cómo: detección, no regex sola
 
 Un regex de email/teléfono atrapa lo estructurado, pero nombres y direcciones necesitan **NER**
-(Named Entity Recognition). La herramienta de referencia open-source es **Microsoft Presidio**, que
-combina reconocedores por regex, por NER (spaCy) y por checksum (ej. validación de tarjeta con
-Luhn), y tiene un *anonymizer* que reemplaza la entidad por un placeholder.
+(Named Entity Recognition). La herramienta de referencia open-source es **Presidio** (originada en
+Microsoft; desde su transición de gobernanza pasó a ser un proyecto community-owned bajo la
+organización `data-privacy-stack` — mismo código, licencia MIT, nuevo home en
+`presidio.dataprivacystack.org`), que combina reconocedores por regex, por NER (spaCy) y por
+checksum (ej. validación de tarjeta con Luhn), y tiene un *anonymizer* que reemplaza la entidad por
+un placeholder.
+
+> **Pin de versiones (reproducibilidad):** `presidio-analyzer` / `presidio-anonymizer` >=2.2.363,
+> `spacy` >=3.8,<3.9, y el modelo `es_core_news_sm` en la versión que matchea el core de spaCy
+> (`3.8.x`). Fijalos en tu `requirements.txt` — ambos proyectos liberan seguido y una entidad o API
+> puede moverse entre versiones.
 
 ```python
 # services/api/pii.py  — detección + redacción de PII
@@ -241,7 +326,8 @@ Detalles que vas a tener que defender:
   (precision/recall de detección) contra un set etiquetado. "Lo medí" otra vez es la respuesta de
   senior.
 - **Idioma.** Presidio depende del modelo de spaCy del idioma; soporte en español necesita el modelo
-  `es`. Defendé que sabés que la detección es por-idioma.
+  `es_core_news_sm` (o una variante más grande) en la versión compatible con tu core de spaCy.
+  Defendé que sabés que la detección es por-idioma y que el par core+modelo va pinned junto.
 
 > **Checkpoint:** ¿por qué redactar en ingesta y no solo en la respuesta? Porque en ingesta la PII
 > nunca toca tu vector store, tus logs ni la API del proveedor (minimización de datos); la redacción
@@ -450,6 +536,11 @@ Por qué esto es correcto, no teatro:
   grupos están en el claim que el server firmó. Mismo principio que `tenant_id` en M4.
 - **Es determinístico.** No depende del modelo. Una condición de SQL.
 
+> **Versión de pgvector (nota de seguridad):** fijá `pgvector >=0.8.2`. La 0.8.2 corrige un buffer
+> overflow en builds HNSW paralelos (CVE-2026-3172) que puede filtrar datos de otras relaciones o
+> crashear el servidor — relevante en este capítulo porque estás usando pgvector precisamente para
+> filtrar por ACL; una versión vieja del índice puede socavar esa garantía a nivel de motor.
+
 ### Defensa en profundidad: RLS con dos dimensiones
 
 Igual que en M4, podés mover el filtro a una política de Postgres RLS para que la DB rechace filas no
@@ -494,6 +585,11 @@ propias palabras, un *"LLM vulnerability scanner"* — el `nmap` de los LLMs. Ti
 nosotros, **a tu endpoint** (REST de Grounded) vía un generator custom, así garak ataca *tu sistema
 completo* (retrieval + prompt + defensas), no solo el modelo crudo.
 
+> **Pin de versión:** `garak==0.15.1` (última en PyPI a jul-2026). El repo es muy activo — pinealo
+> para reproducibilidad. Novedades recientes relevantes: probes **ProPILE** para leakage de PII
+> (encaja directo con LLM02/§3), soporte de generators vía la librería `simonw/llm`, y salida de
+> reporte en JSON además de JSONL/HTML.
+
 Probes relevantes para Grounded:
 - **`promptinject` / `dan` / `jailbreak`** → injection directa y jailbreaks (LLM01).
 - **`encoding`** → payloads ofuscados (base64, ROT13…) que evaden tus markers de §5.2.
@@ -503,7 +599,7 @@ Probes relevantes para Grounded:
   porque son específicas de tu producto.
 
 ```bash
-# garak apuntado a un endpoint REST custom (tu API de Grounded), con probes de injection y jailbreak
+# garak (pin 0.15.1) apuntado a un endpoint REST custom (tu API de Grounded)
 uv run garak \
   --model_type rest \
   --generator_option_file grounded_rest.json \
@@ -520,6 +616,12 @@ jailbreaks genéricos, que nunca dan 0). Eso es seguridad verificada en cada pus
 
 Te van a preguntar por qué garak y no promptfoo (o al revés). La respuesta corta: **hacen cosas
 distintas y se complementan.**
+
+> **promptfoo hoy:** pasó a ser parte de OpenAI (sigue open source, licencia MIT) — dato relevante
+> si lo presentás como herramienta neutral de red-team. Fijá al menos `promptfoo>=0.121` (la última
+> es 0.121.18, releases casi semanales); novedades recientes útiles para este módulo: *context
+> purpose overrides* para escenarios red-team más granulares y *runtime tags* para trazabilidad de
+> corridas adversariales.
 
 | | **garak** | **promptfoo** |
 |---|---|---|
@@ -548,8 +650,9 @@ respondés con tus palabras, tus defensas y tu suite, el módulo no está cerrad
 
 - **"¿Qué es la lethal trifecta?"** (§0) — las 3 propiedades (acceso a datos privados + exposición
   a contenido no confiable + comunicación externa); que su presencia simultánea hace exfiltrable al
-  sistema; que la defensa es eliminar una pata, no agregar guardrails; los ataques reales de 2025
-  (Supabase MCP, Summer of Johann).
+  sistema; que la defensa es eliminar una pata, no agregar guardrails; ataques reales de 2025-2026
+  (Supabase MCP, Summer of Johann, LiteLLM supply-chain, postmark-mcp) y la tendencia de cortar una
+  pata deterministamente (OpenAI Lockdown Mode).
 - **"¿Qué es el Agents Rule of Two?"** (§0) — máximo 2 de las 3 propiedades riesgosas en un
   agente; si tiene las tres, hay que quitar una antes de deployar.
 - **"¿Tu MCP server de M3 es un vector de ataque? ¿Cómo lo limitaste?"** (§0) — análisis de la
@@ -573,6 +676,9 @@ respondés con tus palabras, tus defensas y tu suite, el módulo no está cerrad
 - **"Nombrá los riesgos de OWASP LLM que tu sistema toca, por ID y nombre."** (§2) — **LLM01
   Prompt Injection**, **LLM02 Sensitive Information Disclosure**, **LLM06 Excessive Agency**,
   **LLM08 Vector & Embedding Weaknesses**, **LLM09 Misinformation**.
+- **"¿LLM Top 10 y ASI Top 10 son la misma lista?"** (§2) — no: son dos frameworks OWASP distintos
+  y coexistentes. LLM Top 10 (LLM01-LLM10, riesgos del modelo/app) vs ASI Top 10 (ASI01-ASI10,
+  riesgos de comportamiento agéntico, dic-2025) — no confundirlos en entrevista.
 
 Seguí con `material-apoyo.md` para las fuentes canónicas, después `practica.md` para construir las
 defensas y la suite, y cerrá con los **defense drills** de `pruebas.md`.

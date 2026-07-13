@@ -7,6 +7,10 @@ duration: ~8-10h lectura + 1-2 findes de práctica
 
 # M4 — Volver el sistema confiable, aislado y resume-able
 
+> **Contenido verificado en julio 2026.** Las APIs y librerías de este módulo (OpenAI, Instructor,
+> PyJWT, Railway/Fly) cambian con frecuencia — donde importa, la lección marca explícitamente qué
+> es estable y qué tiene fecha de vencimiento conocida.
+
 > **Qué vas a saber al terminar esta lección:** forzar al LLM a devolver JSON validado contra
 > un schema (sin parsear texto a mano), hacer que cite el pasaje exacto que usó, que diga "no sé"
 > *cuando corresponde* (y leer logprobs para saber cuán seguro está), y — lo más importante para
@@ -57,8 +61,23 @@ después las fuentes, después si la encontraste") y parsear el texto. Esto **se
 
 - El modelo a veces agrega "¡Claro! Acá va:" antes del JSON.
 - A veces usa comillas tipográficas, o un trailing comma, y `json.loads` explota.
-- Cuando cambiás de modelo (GPT-4o → GPT-4o-mini para bajar costo), el formato cambia sutilmente.
+- Cuando cambiás de modelo (por costo, por deprecation, o porque salió uno nuevo), el formato
+  cambia sutilmente.
 - Tu regex de hoy es la deuda técnica de mañana.
+
+> **Sobre qué modelo usar (julio 2026):** OpenAI retiró GPT-4o y GPT-4.1 de ChatGPT en febrero
+> 2026, pero **en la API siguen disponibles** — como modelos **legacy**, con fecha de shutdown ya
+> anunciada para snapshots puntuales (ej. `gpt-4o-2024-05-13` se apaga el 23 de octubre de 2026;
+> ver `developers.openai.com/api/docs/deprecations`). El default recomendado hoy por OpenAI es la
+> familia **GPT-5**: `gpt-5.5-instant` reemplazó a `gpt-5.3-instant` como default de ChatGPT en
+> mayo 2026, y a julio 2026 la línea de producción es **GPT-5.6** (variantes Sol/Terra/Luna), con
+> `gpt-5.4-mini` como tier económico. Este dato tiene fecha de vencimiento corta — no lo memorices,
+> chequeá `developers.openai.com/api/docs/models` antes de fijar un default en producción. Para el
+> checkpoint de Grounded, dos reglas simples: (1) **versioná el snapshot
+> explícito** en el código (`gpt-4o-2024-08-06`, no el alias desnudo `gpt-4o`) para que un cambio
+> de default de OpenAI no te rompa el pipeline sin aviso; (2) envolvé la llamada en un
+> try/except que loguee claro si el modelo dejó de resolver, para no depender de que te enterés
+> por un ticket de soporte.
 
 **Structured outputs** elimina esto: el modelo devuelve JSON que *cumple un schema que vos
 definís*, validado. Hay tres formas, de menos a más garantizada:
@@ -72,18 +91,31 @@ definís*, validado. Hay tres formas, de menos a más garantizada:
 OpenAI Structured Outputs con `strict: true` usa **constrained decoding**: en cada paso de
 generación, el sampler solo puede emitir tokens que mantengan la salida válida contra el schema.
 No es "le pedí amablemente"; es "no puede emitir otra cosa". Esa es la diferencia entre teatro y
-garantía.
+garantía. OpenAI describe explícitamente **JSON mode como legacy** frente a Structured Outputs
+(`developers.openai.com/api/docs/guides/structured-outputs`) — la tabla de arriba no es una
+comparación entre iguales, es "usá la de abajo".
+
+> **Chat Completions vs Responses API:** todo el código de este módulo (acá, en logprobs §5, y en
+> `practica.md`) usa la **Chat Completions API** (`client.chat.completions.create`). OpenAI viene
+> empujando una interfaz más nueva, la **Responses API**, que también soporta structured outputs
+> con un schema equivalente. No son 1:1 portables entre sí — más abajo en §5 vas a ver por qué
+> importa saber en cuál API estás parado.
 
 ### Instructor: structured outputs con Pydantic
 
-En Python, la herramienta de facto para esto es **Instructor**. Parchea el cliente de OpenAI y te
-deja pedir directamente una instancia de un modelo Pydantic como respuesta. Definís el schema una
-vez (Pydantic, tu `zod` de Python, ver M0 §8) y Instructor se encarga del schema JSON, la
-validación, y los **reintentos automáticos** si la validación falla.
+En Python, la herramienta de facto para esto es **Instructor** (`python.useinstructor.com`,
+`github.com/567-labs/instructor` — 11k+ estrellas, 3M+ descargas/mes, versión estable
+`1.15.4`). Te deja pedir directamente una instancia de un modelo Pydantic como respuesta. Definís
+el schema una vez (Pydantic, tu `zod` de Python, ver M0 §8) y Instructor se encarga del schema
+JSON, la validación, y los **reintentos automáticos** si la validación falla.
+
+El patrón canónico de la doc oficial hoy es `instructor.from_provider("<provider>/<model>")` — una
+interfaz unificada que funciona igual para OpenAI, Anthropic, Gemini, Ollama y 15+ providers más
+(el viejo `instructor.from_openai(OpenAI())` sigue andando por retrocompatibilidad, pero ya no es
+el ejemplo que muestra la doc):
 
 ```python
 import instructor
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 class Citation(BaseModel):
@@ -95,10 +127,9 @@ class Answer(BaseModel):
     citations: list[Citation]
     answered: bool = Field(description="True si el contexto contenía la respuesta; False si no")
 
-client = instructor.from_openai(OpenAI())
+client = instructor.from_provider("openai/gpt-4o-2024-08-06")
 
 answer = client.chat.completions.create(
-    model="gpt-4o-mini",
     response_model=Answer,          # <- pedís el TIPO, no texto
     max_retries=2,                  # <- si Pydantic falla, reintenta con el error como feedback
     messages=[
@@ -128,11 +159,14 @@ Lo que ganás:
 > reintentos validados.
 
 > **Nota de defensa:** Instructor vs la API nativa de OpenAI. Instructor es portable (anda con
-> Anthropic, Gemini, Ollama, no solo OpenAI) y te da el loop de reintento con feedback de
-> validación. La API nativa de Structured Outputs es más estricta (constrained decoding de
-> verdad) pero atada a OpenAI. En Grounded usamos Instructor por portabilidad y por los
+> Anthropic, Gemini, Ollama, no solo OpenAI, vía `from_provider`) y te da el loop de reintento con
+> feedback de validación. La API nativa de Structured Outputs es más estricta (constrained
+> decoding de verdad) pero atada a OpenAI. En Grounded usamos Instructor por portabilidad y por los
 > reintentos; en producción podés usar el `strict` mode nativo *a través* de Instructor. Esto
-> es un ADR (ADR-00X) que tenés que poder justificar.
+> es un ADR (ADR-00X) que tenés que poder justificar. *Watch-item, no bloqueante:* en mayo 2026
+> Anthropic adquirió Stainless, la infraestructura que genera los SDKs oficiales de OpenAI, Gemini
+> y buena parte del ecosistema OpenAPI — vale la pena vigilar si eso mueve cómo evolucionan esos
+> SDKs, aunque hoy no cambia nada de lo que Instructor soporta.
 
 ---
 
@@ -226,8 +260,8 @@ más confianza.
 
 ### Cómo los leés en la API de OpenAI
 
-Pedís `logprobs=True` (y opcionalmente `top_logprobs=N` para ver las N alternativas que el modelo
-consideró en cada paso):
+Pedís `logprobs=True` (y opcionalmente `top_logprobs=N`, hasta 20, para ver las N alternativas que
+el modelo consideró en cada paso):
 
 ```python
 from openai import OpenAI
@@ -235,7 +269,7 @@ import math
 
 client = OpenAI()
 resp = client.chat.completions.create(
-    model="gpt-4o-mini",
+    model="gpt-4o-2024-08-06",
     messages=[...],
     logprobs=True,
     top_logprobs=5,   # las 5 alternativas por token, con sus logprobs
@@ -247,6 +281,15 @@ for t in tokens:
     print(f"{t.token!r:15} prob={prob:.3f}")
     # t.top_logprobs lista las alternativas que el modelo barajó en ese paso
 ```
+
+> **Atado a Chat Completions, no portable 1:1 a Responses API todavía.** Este ejemplo usa la
+> **Chat Completions API**. La **Responses API** (la interfaz más nueva de OpenAI, ver §2) **no
+> soporta logprobs** a julio 2026 — si en algún momento migrás Grounded a Responses API por otras
+> razones, vas a tener que resolver la señal de confianza de otra forma (o quedarte en Chat
+> Completions para este endpoint puntual). No asumas que el parámetro viaja gratis entre APIs.
+> `logprobs` sigue disponible en `gpt-4o`, `gpt-4o-mini`, la familia `gpt-4.1` y GPT-5, pero
+> **no** en los modelos de razonamiento (o1/o3-mini y equivalentes) — coherente con que ahí no
+> hay "un token a la vez" que leer de la misma forma.
 
 ### Cómo lo convertís en una señal de confianza del producto
 
@@ -372,13 +415,22 @@ deja declarar una política a nivel de tabla que aplica el filtro *aunque la que
 ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON chunks
   USING (tenant_id = current_setting('app.current_tenant')::text);
--- y en cada request, tras verificar el JWT:  SET app.current_tenant = '<tenant del JWT>';
+-- y en cada request, tras verificar el JWT:
+SET LOCAL app.current_tenant = '<tenant del JWT>';
 ```
 
 Ahora la base *misma* rechaza ver filas de otro tenant, sea cual sea la query. Es el cinturón
 además de los tirantes. Para el checkpoint M4 alcanza con el filtro explícito + el test (abajo);
 RLS es el siguiente nivel y un gran punto de ADR ("defensa en profundidad: filtro en código +
 RLS en DB").
+
+> **`SET LOCAL`, nunca `SET` a secas — esto es un bug real, no teórico.** `SET LOCAL` escopea el
+> valor a la transacción actual: termina el request, termina el valor. `SET` (sin `LOCAL`) deja el
+> valor pegado a la *conexión*. En producción usás **connection pooling** (pgbouncer, o el pool del
+> ORM) — las conexiones se reciclan entre requests de *distintos* tenants. Si seteás con `SET` a
+> secas, el `tenant_id` del request anterior puede quedar activo y filtrarse al siguiente tenant
+> que reutilice esa conexión: exactamente la fuga cross-tenant que RLS existe para prevenir. Envolvé
+> el `SET LOCAL` + la query en la misma transacción explícita.
 
 ### El test que lo prueba (lo más importante del módulo)
 
@@ -428,8 +480,13 @@ Grounded en 5 minutos** y que vos puedas **defenderlo en el loop**. Eso exige ci
 además del código:
 
 1. **Deploy público con TLS.** Una URL `https://` que funciona (frontend + API conectados). TLS
-   no es opcional: sin candado, no es un producto. Railway/Fly te dan TLS gratis en el dominio que
-   asignan. (Detalle en `practica.md`.)
+   no es opcional: sin candado, no es un producto. Railway y Fly.io siguen dando **TLS/certificados
+   gratis** en el dominio que asignan (Let's Encrypt automático), pero ojo con el encuadre del
+   hosting: **Fly.io** da un trial de 2 VM-horas/7 días y después cobra desde el primer dólar
+   (100% pay-as-you-go, pide tarjeta). **Railway** da un trial de 30 días con crédito y, al vencer,
+   cae primero a un **Free plan** con ~$1/mes de crédito perpetuo (casi nada, pero existe) antes de
+   necesitar pasarte a Hobby (~$5/mes) para uso real. El TLS es gratis en los dos; el hosting
+   gratis-de-verdad, no. Presupuestalo. (Detalle en `practica.md`.)
 
 2. **`DECISIONS.md` con ADRs.** El log de cada decisión no-trivial con alternativas y el número/
    criterio que la respaldó. Para M4: structured outputs (Instructor vs API nativa), umbral de
@@ -444,7 +501,10 @@ además del código:
 
 4. **README con métricas.** No "es un RAG". Sino: **recall@5 = X% (hybrid+rerank vs Y% naive
    baseline)** (de M3), **aislamiento cross-tenant verificado** (link al test), stack, cómo
-   correrlo, link al deploy y al eval dashboard. Números, no adjetivos.
+   correrlo, link al deploy y al eval dashboard. Números, no adjetivos. Si tenés tiempo, corré un
+   **bootstrap pareado** (paired bootstrap significance test) entre baseline y hybrid+rerank sobre
+   tu golden set — te dice si la mejora de recall@5 es real o ruido del propio dataset, y es la
+   diferencia entre "mejoré 4 puntos" y "mejoré 4 puntos, estadísticamente significativo (p<0.05)".
 
 5. **Demo.** Un Loom de 2-3 min: subo doc → pregunto → respuesta con cita verificada y badge de
    confianza → pregunto algo que no está → dice "no sé" → muestro el test de aislamiento en verde.

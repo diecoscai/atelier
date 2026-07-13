@@ -23,10 +23,14 @@ cobra.
 **El framing de mercado 2026 para lo que construiste:**
 
 El stack de Grounded — RAG + evals + agentes + observabilidad — es exactamente el stack que el
-mercado 2026 llama **Forward Deployed Engineer (FDE)**, un rol que creció +800% YoY y tiene comp
-de $300K–$600K+. Las empresas que contratan FDEs piden exactamente lo que M0–M7 enseña. El
-packaging de M11 no es "tengo un proyecto de portfolio" — es "construí el stack del rol de mayor
-crecimiento del mercado". Decilo así en el CV.
+mercado 2026 llama **Forward Deployed Engineer (FDE)**, un rol cuyos listings crecieron +800% en
+2025. Separando base de comp total (no son lo mismo, y mezclarlos infla la expectativa): el
+salario **BASE** mediano de entrada ronda los $210K (percentil 25: $165K, percentil 75: $243K); la
+comp **TOTAL** (base+equity+bonus) por nivel va de ~$385K en mid-level a ~$610K en staff, con
+principals de frontier labs (Anthropic/OpenAI) superando el $1.2M — la equity ya representa
+55-70% del comp en la cima del mercado. Las empresas que contratan FDEs piden exactamente lo que
+M0–M7 enseña. El packaging de M11 no es "tengo un proyecto de portfolio" — es "construí el stack
+del rol de mayor crecimiento del mercado". Decilo así en el CV.
 
 Los keywords de ATS 2026 para este framing (además de los técnicos del sistema) son:
 **context engineering**, **agentic engineering**, **harness engineering**, **trace grading**.
@@ -81,6 +85,19 @@ hiring manager, de mayor a menor. Construís y amplificás en este orden:
 | **7** | **MCP server publicado + amplificado** | Señal del segmento de mercado de más rápido crecimiento. Un repo con README claro y algunas stars = "está en la frontera". | ✅ existe (M3), falta amplificar |
 | **8** | **Sitio personal 1-página** | El hub que une todo: demo, dashboard, posts, CV, GitHub. Una URL para mandar. | A armar |
 
+> **Nota urgente (jul-2026) sobre la señal #7:** si tu diferenciador es un MCP server, revisalo
+> antes del **28-jul-2026**. Ese día se congela en firme la especificación MCP `2026-07-28`
+> (release candidate publicado desde el 21-may-2026) — "la revisión más grande del protocolo
+> desde su lanzamiento". Cambios clave: el protocolo core pasa a ser **stateless** (ya no hay
+> session pinning a una instancia de servidor específica — se escala con load balancing
+> round-robin plano, sin sticky sessions), "Tasks" (feature experimental-core desde nov-2025) se
+> degrada a extensión opcional, y se suma **"MCP Apps"** (los servidores pueden enviar UIs HTML
+> interactivas, renderizadas en un iframe sandboxed). Además debuta una **Feature Lifecycle
+> Policy** (Active → Deprecated → Removed, mínimo 12 meses entre deprecación y remoción), así que
+> de acá en más los cambios de la spec van a ser más predecibles. Actualizá el SDK y volvé a
+> correr tu suite de MCP contra el RC antes de amplificarlo — un repo roto le resta más señal de
+> la que suma.
+
 Regla mental: **el #1 y #2 son no-negociables.** Si solo tuvieras tiempo para dos cosas, son el
 demo live y los outcomes cuantificados. Todo lo demás amplifica esos dos.
 
@@ -115,11 +132,20 @@ Venís de TS, full-stack. El instinto es presentarte como "full-stack developer 
 en AI". **Eso te subvende y te mete en la pila equivocada.** El reframe es a "AI Engineer que
 construye sistemas LLM de producción".
 
-**Los números de mercado 2026 para anclar el reframe:** el AI Engineer promedio en US gana $206K
-(+$50K vs 2025). Las posiciones de agentic engineering — el perfil que más se alinea con lo que
-construiste — crecieron +280% YoY con ~90K listings en early 2026. El rol FDE (Forward Deployed
-Engineer), que pide exactamente tu stack, tiene comp de $300K–$600K+. No estás apuntando a un
-nicho marginal: estás apuntando al segmento de mayor crecimiento del mercado.
+**Los números de mercado 2026 para anclar el reframe** (con la salvedad de que varían fuerte según
+fuente y metodología — no cites un solo número como si fuera absoluto): el AI Engineer en US tiene
+un salario **base** promedio de ~$173K según Glassdoor (feb-2026; percentil 90 sube a ~$270K),
+mientras que la comp **total** promedio (base+equity+bonus) ronda los $206K–$243K según el
+agregador consultado. No hay un número único, pero el piso ya es comp de ingeniero senior, y el
+crecimiento salarial del tier AI/ML ronda el 4.1% anual en 2026 — ~2.5x el promedio del resto de
+tech. Las posiciones de agentic engineering — el perfil que más se alinea con lo que construiste —
+crecieron +280% YoY con ~90K listings (Stanford AI Index 2026), y LinkedIn nombró "AI Engineer" el
+título de más rápido crecimiento en EE.UU. en 2026. El rol FDE (Forward Deployed Engineer), que
+pide exactamente tu stack, hay que leerlo separando base de total (ver intro de la sección arriba):
+salario **base** mediano de entrada ~$210K (percentil 25: $165K, percentil 75: $243K); comp
+**total** por nivel ~$385K en mid-level, ~$610K en staff, $1.2M+ en principal level de frontier
+labs. No estás apuntando a un nicho marginal: estás apuntando al segmento de mayor crecimiento del
+mercado.
 
 Usá la definición de **swyx** ("The Rise of the AI Engineer"): el AI Engineer es quien construye
 *productos* sobre foundation models — vive en la capa entre el ML researcher y el product
@@ -151,6 +177,27 @@ Regla: **solo reclamás keywords que podés defender.** Si está en el CV, tiene
 `criterios-defensa.md` como mínimo a nivel *can-explain*, idealmente *can-build*. Un keyword que
 no podés defender en la entrevista es peor que no tenerlo: te quema la credibilidad.
 
+Cuatro matices para que estos keywords no te descoloquen en la entrevista:
+
+- **LangGraph** alcanzó **1.0 GA** en 2026 (versión estable actual 1.2.x, releases casi semanales)
+  — dejó de ser pre-1.0/inestable y ahora tiene garantías de estabilidad de API. Adoptado en
+  producción por Uber, LinkedIn y Klarna, lo que confirma que ya es una apuesta segura para
+  nombrar en el CV, no una herramienta experimental.
+- **Fine-tuning (QLoRA):** OpenAI está desarmando su API de fine-tuning gestionado en fases desde
+  mayo 2026 (cierre total ene-2027) y Anthropic nunca la expuso directo en su propia API. La vía
+  viable en 2026 es **QLoRA self-hosted sobre modelos open-weight** (entrena overnight en una GPU
+  de consumo de 24GB, ~$5–30 en spot cloud, toolchain Unsloth/Axolotl/TRL). Si reclamás QLoRA,
+  aclará que es self-hosted — no vía API gestionada de un proveedor.
+- **pgvector vs. Qdrant** (la pregunta de "cómo escala 10x" de la mock defense, Ronda 1): con
+  pgvectorscale, Postgres sostiene ~10x más throughput que Qdrant al 99% recall y <100ms hasta
+  ~10M vectores; Qdrant gana en 10M+ vectores, alta concurrencia, index builds e index de metadata.
+  Regla práctica: si ya tenés Postgres y estás bajo 50M vectores, quedate en pgvector; si vectores
+  son el centro de una app nueva a escala moderada-alta, planeá Qdrant desde el diseño.
+- **Semantic caching:** además del stack custom (Redis + librería de embeddings), Redis 8 sumó
+  comandos nativos de vector sets (`VADD`/`VSIM`) que permiten semantic caching sin desplegar una
+  vector DB aparte (interfaz `SemanticCache` de RedisVL). Si tu implementación es custom, mencionalo
+  como comparación — muestra que conocés la opción más simple, no solo la que construiste.
+
 > **Checkpoint:** ¿cuál es la diferencia entre "inflar" y "reframe honesto"?
 > Inflar = reclamar lo que no hiciste o no podés defender (ej. "experto en distributed training"
 > sin haber tocado FSDP). Reframe honesto = nombrar correctamente lo que sí hiciste y podés
@@ -174,6 +221,13 @@ pitch):
 > harness engineering. El stack completo del Forward Deployed Engineer: RAG + evals + agentes +
 > observabilidad. A diferencia de los productos cerrados como My AskAI o Ragie, mi diferenciador
 > es la evaluación medible y la defensibilidad de cada decisión de arquitectura."*
+
+El panorama competitivo de "RAG-as-a-service" creció desde M4: además de My AskAI y Ragie, en 2026
+compiten Vectara, Glean, Onyx y AWS Bedrock Knowledge Bases (con conectores nuevos a
+Confluence/SharePoint/Salesforce). No hace falta nombrarlos todos en el positioning statement —
+alcanza con My AskAI/Ragie como referencia concreta — pero si te preguntan "¿y qué hay de Glean o
+Bedrock KB?" en la entrevista, mostrá que conocés el mercado más amplio, no solo dos nombres
+memorizados.
 
 **Nota de producto avanzado (stretch goal — "reports > Q&A"):** el sistema que construiste es
 un Q&A assistant. El próximo salto de valor, según Jason Liu, es convertirlo en una herramienta
@@ -286,8 +340,19 @@ durante el curso, y qué tiene ROI alto después.
 lab con contenido técnico de engineering real (no AI fluency). En 2026, tener el certificado de
 MCP del mismo laboratorio que lo creó es señal directa de que estás en la frontera.
 
-**Nota sobre OpenAI:** a junio 2026, OpenAI no tiene certificación técnica de engineering.
-Sus certs (AI Foundations, ChatGPT for Teachers) validan AI fluency, no API/agents/evals.
+**Progresión post-curso (opcional, mismo portal):** Anthropic sumó el **Claude Certified
+Architect (CCA)** — un examen proctored más formal (Claude Code, Agent SDK, MCP) sobre la misma
+plataforma Skilljar, un escalón arriba del curso introductorio gratuito. Si ya tenés el
+certificado de MCP y querés profundizar la credencial de Anthropic específicamente, es la
+siguiente parada — pero es de pago y viene después del portfolio, no antes.
+
+**Nota sobre OpenAI:** OpenAI sigue sin una certificación técnica de engineering con examen
+proctored público — el piloto más completo existe, pero en "limited pilot access" solo para
+empleadores selectos. Lo que sí lanzó gratis es **OpenAI Academy**, con tres cursos self-paced:
+AI Foundations, Applied AI Foundations y — el relevante acá — **"Agents and Workflows"** (dar
+contexto a un agente, definir el output esperado, revisar drafts). Vale la pena hacerlo como
+referencia de vocabulario, pero es un curso, no una credencial validada por examen. Sus certs de
+fluency (AI Foundations, ChatGPT for Teachers) siguen validando *uso*, no *build*.
 *"If you're a builder, the credentials don't yet exist."* — no las incluyas en el CV como técnicas.
 
 ### Post-curso — de pago, Tier 1 (ROI alto)
@@ -298,18 +363,31 @@ de producción. El combo recomendado (~$700 total, 3-4 meses de prep en paralelo
 | Credencial | Costo | Qué valida | Por qué elegirla |
 |---|---|---|---|
 | **AWS ML Engineer Associate (MLA-C01)** | $150 | SageMaker, MLOps, CI/CD, producción | Credibilidad de producción; el más reconocido por hiring managers |
-| **AWS GenAI Developer Professional (AIP-C01)** | $150 (beta) | Bedrock, LLMs, GenAI apps en prod | Primera cert Professional específica de GenAI; señal nueva de mercado |
+| **AWS GenAI Developer Professional (AIP-C01)** | $300 | Bedrock, LLMs, GenAI apps en prod | Primera cert Professional específica de GenAI; el beta cerró el 31-mar-2026 y desde entonces está en registro estándar (GA) — 65 preguntas puntuadas + 10 no puntuadas, 180 min, score mínimo 750/1000, validez 3 años. Fuente: [AWS Certification docs](https://docs.aws.amazon.com/aws-certification/latest/ai-professional-01/ai-professional-01.html) |
 | **GCP Professional ML Engineer (PMLE)** | $200 | Vertex AI, MLOps, GenAI, model eval | Prestigio alto; evals de GenAI en scope |
 | **Databricks GenAI Engineer Associate** | $200 | RAG, LLM chains, MLflow, Model Serving | RAG/LLM chains = core 2026; production-focused |
 
 No necesitás las cuatro. AWS MLA-C01 primero (mejor ROI y reconocimiento); después elegí una
 según el stack de la empresa donde estés.
 
-### Evitar (a junio 2026)
+### Retiradas y reemplazadas (a jul-2026)
 
-- **Azure AI Engineer Associate (AI-102):** se retira el 30-jun-2026 — no la prepares.
-- **Oracle OCI AI Foundations:** se retira el 22-jun-2026 — ídem.
-- **Certificaciones OpenAI:** son de AI fluency, no técnicas. No las incluyas en el CV de engineer.
+- **Azure AI Engineer Associate (AI-102):** se retiró el 30-jun-2026 (fecha ya pasada). Su sucesor
+  es **AI-103 "Developing AI Apps and Agents on Azure"** (construida sobre Microsoft Foundry, con
+  scope ampliado a agentic AI development y orquestación multi-agente), pero sigue **en beta** al
+  12-jul-2026 — la fecha de GA no está confirmada. Mismo criterio que aplicamos al beta de AWS
+  AIP-C01 más arriba: no la prepares todavía como reemplazo formal de cara al ATS; considerala solo
+  si buscás estar en la vanguardia, sabiendo que el contenido puede seguir cambiando antes de GA.
+  Si ya tenés el AI-102, se conserva en tu transcript hasta que expire, pero no se puede renovar.
+  Fuente: [examinotion — AI-102 retirement / AI-103 successor path](https://examinotion.com/blog/ai-102-retirement-ai-103-successor-path).
+- **Oracle OCI AI Foundations (versión 2025):** se retiró el 22-jun-2026. Su reemplazo vigente es
+  **"Oracle Cloud Infrastructure 2026 Certified AI Foundations Associate"** (1Z0-1122-26 — mismo
+  patrón de código que la versión 2025, que fue 1Z0-1122-25; no confundir con 1Z0-1085-26, que es
+  la cert general "OCI 2026 Foundations Associate", sin foco en AI), disponible desde antes del
+  retiro, con validez de 24 meses. Si te interesa esta vía, apuntá directo a la versión 2026, no
+  busques la 2025. Fuente: [Oracle University — OCI 2026 Certified AI Foundations Associate](https://education.oracle.com/oracle-cloud-infrastructure-2026-certified-ai-foundations-associate/trackp_OCI26AICFA).
+- **Certificaciones OpenAI:** son de AI fluency o cursos gratuitos (ver "Agents and Workflows"
+  arriba), no certificaciones técnicas proctored. No las incluyas en el CV como técnicas.
 
 > **Checkpoint:** ¿por qué las cloud certs complementan el portfolio en vez de reemplazarlo?
 > Las cloud certs validan delivery (MLOps/serving); no validan las competencias diferenciales del
@@ -328,8 +406,9 @@ capstone no está cerrado:
 - **El positioning statement, de memoria, en 1 línea y en 30 segundos** — con los keywords 2026
   (context engineering, agentic engineering, harness engineering, trace grading, FDE). (Sección 3.2)
 - **El reframe honesto:** por qué sos "AI Engineer" (o FDE candidate) y no "full-stack que usó AI",
-  sostenido con evidencia (el demo, los evals, el aislamiento) y los números de mercado ($206K avg,
-  +280% agentic jobs, +800% FDE). Sin inflar. (Sección 3)
+  sostenido con evidencia (el demo, los evals, el aislamiento) y los números de mercado (base
+  ~$173K–$210K / comp total ~$206K–$243K según fuente y nivel, +280% agentic jobs, +800% FDE
+  listings en 2025) — separando siempre base de comp total. Sin inflar. (Sección 3)
 - **Las señales rankeadas:** qué le mostrás a un recruiter en 90 segundos y por qué *ese* orden.
   (Sección 2)
 - **La estrategia de distribución:** a quién, por dónde, con qué cadencia — y por qué dirigido y

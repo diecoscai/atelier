@@ -23,10 +23,13 @@ resto es referencia para consultar mientras construís o profundización opciona
    `separators`, `chunk_size` vs `chunk_overlap`, y splitters por formato (Markdown/HTML). ~30 min.
 
 3. **Docling — docs oficiales + repo**
-   `docling-project.github.io/docling/` y `github.com/docling-project/docling`
+   `docling-project.github.io/docling/` y `github.com/docling-project/docling` — chunking en
+   detalle: `docling-project.github.io/docling/concepts/chunking/`
    Buscá: el `DocumentConverter`, el `DoclingDocument` y export a Markdown, el manejo de
    **tablas** (TableFormer), y sobre todo el **`HybridChunker`** (chunking layout-aware
-   tokenizer-aware). Es tu parser+chunker default. ~45 min.
+   tokenizer-aware, disponible desde `docling-core` 2.8.0 / `docling` 2.9.0). Es tu
+   parser+chunker default. Proyecto de release rápido (revisá el
+   `CHANGELOG.md` del repo antes de actualizar versión). ~45 min.
 
 4. **Unstructured — docs oficiales + repo**
    `docs.unstructured.io` y `github.com/Unstructured-IO/unstructured`
@@ -37,16 +40,23 @@ resto es referencia para consultar mientras construís o profundización opciona
 ## Referencia (tené a mano mientras construís)
 
 - **pgvector** — `github.com/pgvector/pgvector` — repaso de columnas/filtrado; en M1 le agregás
-  columnas de metadata. Buscá: filtrar con `WHERE` + `ORDER BY embedding <=> $1`.
+  columnas de metadata. Buscá: filtrar con `WHERE` + `ORDER BY embedding <=> $1`, y
+  `hnsw.iterative_scan` (0.8.0+) para cuando el filtro es muy selectivo.
 - **tiktoken** — `github.com/openai/tiktoken` — contar tokens (no caracteres) para medir chunks
-  de forma precisa con el tokenizer de OpenAI.
-- **OpenAI — Vision / images guide** — `platform.openai.com/docs/guides/vision` — cómo pasar una
-  imagen a GPT-4o y pedir una descripción (para el graft multimodal). Buscá: input de imagen
+  de forma precisa. Encoding `cl100k_base` para GPT-3.5/4 clásicos, `o200k_base` para GPT-4o en
+  adelante (más eficiente en español y otros idiomas no ingleses).
+- **OpenAI — Vision / images guide** — `developers.openai.com/api/docs/guides/images-vision`
+  (la doc se movió de `platform.openai.com`) — cómo pasar una imagen a un modelo de visión
+  vigente y pedir una descripción (para el graft multimodal). Buscá: input de imagen
   (base64/URL) y prompting de descripción.
-- **Anthropic — Vision** — `docs.anthropic.com` (sección "Vision") — equivalente con Claude;
-  útil si querés comparar describer de imágenes. Buscá: bloque de imagen en el mensaje.
-- **Tesseract OCR** — `github.com/tesseract-ocr/tesseract` — el motor de OCR que los parsers
-  invocan para PDFs escaneados. Solo necesitás saber que existe y cuándo se dispara.
+- **Anthropic — Vision** — `platform.claude.com/docs/en/build-with-claude/vision` (la doc se
+  movió de `docs.anthropic.com`) — equivalente con Claude; útil si querés comparar describer de
+  imágenes. Buscá: bloque de imagen en el mensaje.
+- **Tesseract OCR** — `github.com/tesseract-ocr/tesseract` — el motor de OCR liviano/CPU que
+  los parsers clásicos invocan para PDFs escaneados. Solo necesitás saber que existe y cuándo se
+  dispara; para awareness de hacia dónde va la industria, mirá también **PaddleOCR**
+  (`github.com/PaddlePaddle/PaddleOCR`) y modelos vision-language de documento (Mistral OCR,
+  Qwen2.5-VL).
 - **`asyncio`** — `docs.python.org/3/library/asyncio.html` — `gather`, `Semaphore` para
   concurrencia limitada en la ingesta.
 
@@ -58,13 +68,15 @@ resto es referencia para consultar mientras construís o profundización opciona
 - **Pinecone — "Chunking Strategies for LLM Applications"** (guía de su learning center). Buen
   resumen aplicado de fixed vs recursive vs semantic y el trade-off de tamaño. Buscá la tabla de
   cuándo usar cada uno.
-- **Anthropic — "Contextual Retrieval"** (post de ingeniería, anthropic.com/news). Técnica de
-  prepender contexto generado a cada chunk antes de embeber para no perder el "de qué sección
-  vengo". Es awareness avanzado: una respuesta fuerte a "¿cómo evitás que un chunk pierda su
-  contexto?". Buscá: la idea de "contextual chunk" y la mejora de retrieval reportada.
-- **Docling technical report** (arXiv — buscá "Docling Technical Report" por sus autores de
-  IBM). Para citar con autoridad por qué Docling es fuerte en tablas/layout. *(No pego el ID de
-  arXiv de memoria; búscalo por título.)*
+- **Anthropic — "Contextual Retrieval"** — `anthropic.com/engineering/contextual-retrieval`
+  (el post se movió de `/news` a `/engineering`). Técnica de prepender contexto generado a cada
+  chunk antes de embeber para no perder el "de qué sección vengo". Es awareness avanzado: una
+  respuesta fuerte a "¿cómo evitás que un chunk pierda su contexto?". Buscá: la idea de
+  "contextual chunk" y la mejora de retrieval reportada.
+- **Docling technical report** — `arxiv.org/abs/2408.09869` ("Docling Technical Report", IBM
+  Research Zurich, agosto 2024). Para citar con autoridad por qué Docling es fuerte en
+  tablas/layout — aclarando que documenta la arquitectura fundacional, no el estado actual del
+  código (Docling evolucionó bastante desde entonces).
 
 ## Cómo usar este material
 

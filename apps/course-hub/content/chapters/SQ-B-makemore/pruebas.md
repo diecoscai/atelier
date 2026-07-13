@@ -9,6 +9,9 @@ gate: pending
 
 - [ ] El MLP entrena: la cross-entropy baja y genera nombres más pronunciables que el bigram.
 - [ ] Cambiar la temperature al samplear cambia la variedad de las salidas de forma observable.
+- [ ] Confirmaste qué modelo llama el endpoint de chat de Grounded, si es de razonamiento
+      (`o1`/`o3`/`gpt-5*`/`gpt-5.6*`) o no, y si esa llamada usa Chat Completions o Responses
+      API — de eso depende si el siguiente ítem funciona sin cambios.
 - [ ] En Grounded, el endpoint de chat captura logprobs de la respuesta generada.
 - [ ] La señal de confianza derivada de logprobs se mueve en la dirección esperada (alta para
       respuestas bien cubiertas, baja para dudosas/no cubiertas).

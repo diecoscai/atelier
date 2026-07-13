@@ -14,8 +14,11 @@ Al terminar la side-quest tenés que poder, en el nivel honesto indicado:
 
 - **(can-explain)** Por qué la **verificación multiplica la calidad 2-3x**: un agente con
   mecanismo de verificación itera hasta que el criterio pasa; sin él, hace un intento y para.
-  Articularlo con la cita de Cherny: *"Giving Claude a way to verify its work is probably the
-  most important thing to get great results."*
+  Articularlo con la cita original de Cherny: *"Giving Claude a way to verify its work is
+  probably the most important thing to get great results."* — o con la versión que hoy aparece
+  en la página oficial de best practices: *"Give Claude a check it can run: tests, a build, a
+  screenshot to compare. It's the difference between a session you watch and one you walk away
+  from."*
 
 - **(can-explain)** La diferencia entre una instrucción en CLAUDE.md y un hook. CLAUDE.md se
   puede ignorar; un PostToolUse hook corre siempre. Lo que DEBE pasar sin excepción va en hook,
@@ -25,12 +28,16 @@ Al terminar la side-quest tenés que poder, en el nivel honesto indicado:
   reviewer para rate limiter" de Cherny tiene contexto específico, sabe qué buscar, tiene un
   criterio de éxito claro. Un "qa agent" genérico no tiene ninguna de esas ventajas. El costo:
   ~15x tokens según el sistema multi-agente de Anthropic — hay que justificarlo con mejora
-  medible.
+  medible. La guía actual también describe **agent teams** (coordinación automática de varias
+  sesiones) como la evolución de correr instancias en paralelo a mano.
 
 - **(can-explain)** La cronología de Karpathy: vibe coding (feb-2025, picar código sin mirar
   demasiado) → "básicamente no funcionaban antes de diciembre" (nov-2025: ~80% código propio) →
-  inflexión (dic-2025: ~80% delegado a agentes) → agentic engineering (feb-2026). La cita:
-  *"Vibe coding raises the floor. Agentic engineering is about extrapolating the ceiling."*
+  inflexión (dic-2025: ~80% delegado a agentes) → agentic engineering (Sequoia AI Ascent,
+  abril-2026). La cita: *"Vibe coding raises the floor. Agentic engineering is about
+  extrapolating the ceiling."* Matiz para la ronda de entrevista: Karpathy se unió a Anthropic
+  en mayo-2026 — no lo cites como observador puramente externo si te preguntan por sesgo de la
+  fuente.
 
 ## can-build
 
@@ -58,8 +65,16 @@ Al terminar la side-quest tenés que poder, en el nivel honesto indicado:
 
 - **(can-defend)** CLAUDE.md vs AGENTS.md: mismo concepto (contrato vivo del repo), distinto
   ecosistema (Anthropic/Claude Code vs OpenAI/Codex). Si te preguntan en una entrevista con
-  stack OpenAI, el equivalente es AGENTS.md.
+  stack OpenAI, el equivalente es AGENTS.md. No hace falta saber qué modelo corre detrás de
+  Codex en un momento dado — cambia cada ~2 meses (GPT-5.4 → 5.5 → familia 5.6) —, sí el patrón.
 
 - **(can-defend)** Por qué Plan Mode reduce errores costosos: los errores más caros de un agente
   de coding son haber implementado lo que no se pidió o elegido la abstracción incorrecta. Plan
   Mode fuerza una parada antes de esa bifurcación.
+
+- **(can-defend)** El caso Rakuten (7 horas autónomas sobre vLLM) es un ejemplo oficial de
+  Anthropic, pero la cifra de tamaño del codebase que reporta (12.5M líneas) está en disputa
+  pública: análisis independientes calculan que vLLM completo ronda las 600k líneas, ~20 veces
+  menos. Si te lo preguntan, citá el resultado (run autónomo de 7 horas, feature completada) con
+  esa salvedad sobre la escala en vez de repetir el número sin matiz — eso es justamente "no
+  aceptar el output crudo" aplicado a una fuente, no solo a código de agente.

@@ -15,8 +15,11 @@ Grounded.
 > tipeaste*, no *pasa un test de CI*.
 
 ## Pre-requisitos
-- Python con `numpy` y `torch` (CPU alcanza para un modelo de juguete). Un Jupyter notebook o
-  Google Colab (T4 free) hace todo más cómodo.
+- Python ≥3.12, `numpy` ≥2.5, `torch` ≥2.13 (o cualquier 2.11+ — nada del código básico de
+  autograd/`nn.Module` que usa la lecture se rompió en las versiones recientes de estas libs).
+  Un Jupyter notebook o Google Colab hace todo más cómodo; el tier gratuito de Colab sigue dando
+  GPU T4, pero no está garantizada por sesión y las sesiones largas repetidas (cerca del límite
+  de ~12h) bajan tu prioridad — no lo trates como always-on.
 - Miraste la lecture **"Let's build GPT"** de `material-apoyo.md`.
 
 ---
@@ -53,8 +56,11 @@ bloques ayuda (Sección 5).
 - la conexión con tu producto: por qué el context window es finito (O(n²)) y por qué eso motiva
   RAG.
 
-**Verificar:** se lo explicás a alguien (o a Claude en modo interviewer) sin mirar el doc y no te
-trabás. Ese es el gate.
+**Verificar:** se lo explicás a alguien (o a Claude — Sonnet 5 u Opus 4.8 dan el mejor rol de
+interviewer) sin mirar el doc y no te trabás. Ese es el gate. (Si querés la corrida más exigente
+posible antes de una entrevista real, Claude Fable 5 es el interviewer adversarial más duro
+disponible — pero es caro y overkill para el uso rutinario; Sonnet 5 u Opus 4.8 alcanzan de
+sobra para esta práctica.)
 
 ---
 

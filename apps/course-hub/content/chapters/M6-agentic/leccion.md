@@ -204,7 +204,13 @@ a defender "¿por qué usás LangGraph?" con algo más que "es popular".
 
 ### 5.4 Harness engineering: lo difícil no es el agente
 
-> *"Agents aren't hard. The Harness is hard."* — swyx, keynote AIEWF, jun-2026
+> *"Agents aren't hard. The Harness is hard."* — frase muy citada en la comunidad de AI
+> Engineering en 2026; la evidencia disponible la rastrea a Ryan Lopopolo (equipo Codex de
+> OpenAI), en un case study sobre un equipo de **tres ingenieros** que generó ~1,500 PRs mergeados
+> sobre ~1M líneas de código con Codex en 5 meses — **no** a swyx, pese a una atribución errónea
+> que circuló. Si la citás en una entrevista, verificá la fuente antes de repetir la atribución
+> equivocada (y el número: es 3, no 7, un error que circuló en algunas versiones); la idea importa
+> más que quién la dijo.
 
 El "harness" es todo lo que rodea al agente: el scaffolding que lo ejecuta, los artefactos de
 handoff, la gestión de errores, el logging, los guardrails, la integración con sistemas
@@ -230,6 +236,13 @@ Agents"):
   historial de trabajo y continuar sin repetir pasos.
 - **Prompts estratificados por fase:** el prompt del initializer no es el mismo que el del worker —
   tienen objetivos distintos y no deben mezclarse.
+
+Anthropic amplió este patrón después: "Harness Design for Long-Running Application Development"
+(mar-2026) formaliza el par **initializer-agent / coding-agent** para trabajo que excede una sola
+ventana de contexto — el initializer-agent arranca la tarea y deja artefactos de handoff; el
+coding-agent los retoma en la siguiente ventana sin re-derivar contexto. Es la extensión directa
+de "Effective Harnesses for Long-Running Agents" citado arriba; leelos juntos en
+`material-apoyo.md`.
 
 > **Checkpoint:** ¿cuál es la diferencia entre el agente y el harness, y por qué importa?
 > El agente es el LLM + su loop de decisión. El harness es todo lo que lo rodea: scaffolding,
@@ -277,7 +290,29 @@ tokens = más costo. Las 4 estrategias son la forma de que esa multiplicación n
 ## 5c. Economía multi-agente: el costo es una decisión de diseño
 
 Del multi-agent research system de Anthropic (jun-2025): un sistema multi-agente superó al single-
-agent Opus 4 en **90.2%** en el eval interno. Costo: **~15x tokens** respecto al single-agent.
+agent Opus 4 en **90.2%** en el eval interno. Costo: **~15x tokens** respecto al single-agent. Es
+un benchmark fechado — no hay una cifra más nueva de Anthropic que lo reemplace, así que citalo
+como referencia histórica de jun-2025, no como estado del arte de hoy.
+
+**Nota de currency sobre el propio nombre "Opus 4":** el `claude-opus-4-20250514` que usaron en ese
+benchmark está retirado desde el 15-jun-2026 — ya pasó esa fecha. La línea Opus siguió: 4 → 4.1 →
+4.5 → 4.6 → 4.7 → 4.8, con **Opus 4.8** como el flagship Opus vigente hoy. Si alguien te pregunta
+"¿y con los modelos actuales replicarías ese 90.2%?", la respuesta honesta es: no hay ese dato
+publicado — el baseline de single-agent ya no es un modelo que exista, así que la cifra es
+referencia histórica de metodología (task descriptions, coordinación), no un target reproducible.
+
+**El ratio de tokens no es el costo en dólares.** Con pricing de jul-2026 (Haiku 4.5 ≈ $1/$5 por
+MTok, Sonnet 5 ≈ $2/$10 intro, Opus 4.8 ≈ $5/$25 por MTok) el tramo Opus se abarató bastante
+respecto a jun-2025 — un run 15x en tokens puede salir bastante menos de 15x en factura real hoy.
+Medí el costo en $ de tu propio sistema con tu propio pricing vigente; no asumas que "15x tokens"
+implica "15x plata". De paso: **Sonnet 5** es la opción intermedia que vale conocer — calidad
+cercana a Opus en tareas de coding/agentic a precio de Sonnet. Si tu `path_judge` (Sección 10) con
+Haiku 4.5 da veredictos poco confiables, subir el judge a Sonnet 5 antes que a Opus es el paso
+lógico: más criterio sin pagar el tramo Opus completo. **Otra arruga en el cálculo de "15x tokens
+≠ 15x plata":** Sonnet 5 trae un tokenizer nuevo que genera **~30% más tokens que Sonnet 4.6 para
+el mismo texto**. Si migrás el judge o cualquier nodo del grafo a Sonnet 5, tu conteo de tokens
+(y por lo tanto el ratio real de costo multi-agente) cambia aunque el pricing por MTok no se
+mueva — medí de nuevo, no reuses el número viejo.
 
 Ese trade-off hay que justificarlo con medición, no con intuición. **Si no podés cuantificar la
 mejora**, el 15x de costo no está justificado. Preguntas que tenés que poder responder:
@@ -300,8 +335,13 @@ gaps — lo cual multiplicaba el costo sin multiplica la calidad.
 
 ## 6. LangGraph: el agente como máquina de estados
 
-¿Por qué LangGraph y no un `while` loop a mano, o LangChain `AgentExecutor`? Porque un agente es,
-literalmente, una **máquina de estados**: nodos (pasos) + edges (transiciones) + un **state**
+¿Por qué LangGraph y no un `while` loop a mano, o `AgentExecutor` de LangChain? **Nota de
+currency:** `AgentExecutor` está formalmente deprecado desde el hito LangGraph/LangChain v1.0
+(oct-2025) — y hasta el prebuilt `create_react_agent` de LangGraph siguió el mismo camino, en
+favor de `create_agent` del paquete `langchain` (sistema de middleware más flexible). Si ves
+`AgentExecutor` o `create_react_agent` en código o tutoriales viejos, es una señal de que están
+desactualizados; el grafo de esta sección usa `StateGraph` a mano, que sigue siendo la API
+estable. Porque un agente es, literalmente, una **máquina de estados**: nodos (pasos) + edges (transiciones) + un **state**
 compartido que cada nodo lee y actualiza. LangGraph hace explícito ese grafo. Eso te compra:
 
 - **Control explícito del flujo.** Vos definís los nodos y las transiciones permitidas. Un agente
@@ -514,7 +554,7 @@ def build_context(question: str, docs: list[str], history: list[str], budget: in
 
 ---
 
-## 9. Reasoning-RAG: por qué o3/Opus/Gemini 2.5 rompen tu pipeline (awareness)
+## 9. Reasoning-RAG: por qué el razonamiento adaptativo rompe tu pipeline (awareness)
 
 Hay un cambio de fondo que tenés que conocer aunque no lo construyas a fondo en este módulo.
 
@@ -525,33 +565,70 @@ Hay un cambio de fondo que tenés que conocer aunque no lo construyas a fondo en
   razonamiento **dirige** la recuperación: decide qué buscar, evalúa lo que trajo, reformula,
   itera — guiado por una cadena de pensamiento profunda, no por un grafo que vos fijaste.
 
-**El hallazgo incómodo (la "nota de currency"):** los **reasoning models** (o3, Claude con
-extended thinking, Gemini 2.5) **ganan poco o incluso degradan** con el RAG document-level
-estándar. ¿Por qué?
+**Nota de currency importante:** para jul-2026, "reasoning models" dejó de ser una categoría de
+modelo aparte. En vez de un modelo separado que "piensa" opcionalmente (la distinción o3 vs
+GPT-4-clase que existía en 2024-2025), el razonamiento se integró como capacidad estándar de los
+modelos flagship de cada laboratorio (GPT-5.x, la familia Claude Opus/Sonnet 4.x, Gemini 3): lo
+que varía por *llamada* es cuánto razona el modelo, vía un parámetro de esfuerzo — en la API de
+Claude, **adaptive thinking** (`thinking: {type: "adaptive"}`, el modelo decide internamente
+cuánto pensar) combinado con `output_config.effort` (`low`/`medium`/`high`/`xhigh`/`max`) para
+controlar el trade-off profundidad/costo. El "extended thinking" manual de budget fijo
+(`budget_tokens`) que existía hasta 2025 está deprecado en Opus/Sonnet 4.6 y **removido** (400 si
+lo mandás) en Opus 4.7 en adelante. Si en 2026 alguien te dice "le agregué extended thinking a
+Claude", preguntá qué versión de API usa — probablemente esté describiendo el mecanismo viejo.
+
+**El hallazgo incómodo se sostiene, con más nuance:** modelos con razonamiento adaptativo activo
+**ganan poco o incluso degradan** con el RAG document-level estándar. ¿Por qué?
 - Tu pipeline les inyecta chunks *antes* de que razonen. Pero su fuerza es razonar *para decidir
   qué necesitan*. Le diste la respuesta antes de que formule la pregunta interna → cortocircuitás
   su mejor capacidad.
 - Los chunks rankeados por similarity superficial pueden ser ruido para un modelo que razonaría
   hacia evidencia más precisa. Un contexto recuperado mediocre **arrastra hacia abajo** a un
   modelo que, dejado razonar e iterar, recuperaría mejor.
+- Investigación de 2026 agrega un matiz sobre "lost in the middle" (Sección 8): modelos
+  reasoning-heavy no solo ganan poco con RAG estándar — son **más sensibles al ruido** en el
+  contexto recuperado que los modelos sin razonamiento activo. El problema de posición/orden se
+  agrava, no se resuelve, cuando el modelo razona sobre contexto ruidoso.
+- Un paper con ID verificable (a diferencia de otros que vas a encontrar buscando el tema, ver
+  `material-apoyo.md`) plantea una salida: **"RAG over Thinking Traces Can Improve Reasoning
+  Tasks"** (arXiv:2605.03344, 2026) — recuperar *trazas de razonamiento* previas en vez de
+  documentos crudos mejora tareas de razonamiento (AIME, LiveCodeBench, GPQA-Diamond). El
+  argumento: el límite no es RAG en sí mismo, es *qué* le das a recuperar.
+
+**Nota de currency — modelos específicos y fechas de fin de vida (jul-2026), por si los nombrás
+en una entrevista o en código:**
+- **o3** (OpenAI): se retira de ChatGPT el 26-ago-2026; los snapshots de API (`o3`, `o3-pro`) se
+  mapean a `gpt-5.5`/`gpt-5.5-pro` y se apagan el 11-dic-2026. No lo cites como modelo vivo para
+  testear después de esas fechas.
+- **Gemini 2.5** (Pro/Flash): GA solo hasta el 16-oct-2026; después Google recomienda migrar a
+  Gemini 3.
+- **Claude:** no hay "modelo reasoning" separado — hay adaptive thinking + `effort` disponible en
+  toda la línea flagship actual (Sonnet 5, Opus 4.7/4.8, Fable 5).
 
 **Cómo lo adaptarías (esto va a `DECISIONS.md` como entry, no es código obligatorio del módulo):**
 - **Darle al modelo el control del retrieval** (retrieval como *tool* que el reasoning invoca
-  cuando decide, no un paso forzado upstream). El reasoning model *es* el agente de la Sección 4.
+  cuando decide, no un paso forzado upstream). El modelo con razonamiento activo *es* el agente de
+  la Sección 4.
 - **Recuperar más grueso, no más fino.** Pasajes más largos o documentos enteros para que el
   modelo razone sobre material rico, en vez de chunks chiquitos pre-filtrados que le esconden
   contexto.
-- **Rutear por modelo** (conecta con M7): reasoning models → System 2 (retrieval-as-tool);
-  modelos rápidos → System 1 (pipeline fijo). No uses el mismo pipeline para los dos.
-- **Cuidado con el costo/latencia:** System 2 con un reasoning model es *caro y lento*. Lo reservás
-  para las queries que lo justifican (otra vez: routing).
+- **Rutear por nivel de esfuerzo, no por "tipo de modelo"** (conecta con M7): en 2026 esto es un
+  parámetro por-llamada (`effort`), no elegir entre dos productos distintos. Queries que se
+  benefician de razonar sobre su propio retrieval → `effort` alto + retrieval-as-tool (System 2);
+  queries simples → `effort` bajo/medio + pipeline fijo (System 1). No uses el mismo nivel de
+  esfuerzo para todo.
+- **Cuidado con el costo/latencia:** `effort` alto con retrieval-as-tool es *caro y lento*. Lo
+  reservás para las queries que lo justifican (otra vez: routing).
 
-> **Checkpoint:** "Cambié mi LLM de generación a o3 y mis métricas de RAG no mejoraron / empeoraron.
-> ¿Por qué?" **Respuesta:** Porque tu pipeline es System 1 (le inyectás contexto antes de que
-> razone) y un reasoning model rinde cuando *dirige* su propia recuperación (System 2). Le estás
-> cortando su mejor capacidad. La adaptación es darle el retrieval como tool y recuperar más grueso
-> — y rutear: no todos los modelos quieren el mismo pipeline. Saber esto **es** la señal de
-> currency que distingue a alguien que leyó papers de 2025 de alguien parado en 2023.
+> **Checkpoint:** "Cambié mi LLM de generación a un modelo con `effort` alto y mis métricas de RAG
+> no mejoraron / empeoraron. ¿Por qué?" **Respuesta:** Porque tu pipeline es System 1 (le
+> inyectás contexto antes de que razone) y un modelo con razonamiento adaptativo activo rinde
+> cuando *dirige* su propia recuperación (System 2). Le estás cortando su mejor capacidad. La
+> adaptación es darle el retrieval como tool, recuperar más grueso, y rutear el nivel de esfuerzo
+> por query — no todas las queries quieren el mismo `effort`. Saber que "reasoning models" ya no
+> es una categoría de modelo separada sino un parámetro de esfuerzo integrado a los modelos
+> flagship **es** la señal de currency que distingue a alguien parado en 2026 de alguien parado
+> en 2023.
 
 ---
 
@@ -646,6 +723,22 @@ Lo que varía es el modelo mental:
 - Claude Agent SDK → harness + skills composables + brain/hands/session desacoplados.
 - OpenAI Agents SDK → handoffs como tool calls + guardrails de in/out.
 
+**Nota de currency (jul-2026):** desde el 15-jun-2026 el uso del Claude Agent SDK (y de Claude
+Code GitHub Actions) se factura **separado** del uso interactivo de Claude Code — un cambio de
+pricing posterior a como se suele describir el SDK. Las Agent Skills además ganaron paquetes
+pre-armados (PowerPoint, Excel, Word, PDF) disponibles en Claude Platform, AWS, Microsoft Foundry
+y claude.ai — no hace falta escribirlos de cero. Ojo con la fila "tracing built-in" de la tabla:
+no está documentada con la misma precisión que el resto de las features del SDK — antes de
+citarla en una entrevista, confirmá en `code.claude.com/docs/en/agent-sdk` qué expone
+exactamente. Y "Skills" no es un concepto único: en la Messages API (`container.skills` + code
+execution tool) son paquetes pre-armados tipo `pptx`/`xlsx`; en Managed Agents y en el Agent SDK
+son carpetas con su propio `SKILL.md`, de disclosure progresivo (descripción en contexto por
+default, archivo completo solo si el agente lo necesita) — el Agent SDK sigue este segundo
+modelo. Del lado de OpenAI, el Agents SDK sumó un stack de "unified tracing" y preparación de
+sesión sandbox-aware, pero su documentación pública no deja explícito si el tracing "by default"
+cae en el dashboard de OpenAI o requiere wiring externo a OTel — no asumas cuál sin revisar la doc
+de tracing del SDK vos mismo.
+
 **No vas a implementar los tres en el módulo.** LangGraph sigue siendo la implementación del
 curso. Lo que sí tenés que poder defender: "conozco las alternativas, en qué se diferencian, y
 por qué elegí LangGraph para este caso". Awareness sin hype: las tres son herramientas válidas
@@ -705,8 +798,9 @@ tus palabras y tus decisiones, el módulo no está cerrado:
   JIT, isolate per task, compress history) + las palancas de implementación. (Secciones 5b y 8)
 - "**¿Cómo evaluás un agente, no solo una respuesta?**" — trajectory eval + trace grading por el
   harness de M2. (Sección 10) — *la más probable y la más castigada si la fallás.*
-- "**¿Cómo adaptás RAG para un reasoning model** (o3 / extended thinking / Gemini 2.5)?" —
-  System 1 vs System 2, retrieval-as-tool, recuperar más grueso, rutear por modelo. (Sección 9)
+- "**¿Cómo adaptás RAG para un modelo con razonamiento adaptativo** (Claude con `effort` alto,
+  GPT-5.x, Gemini 3)?" — System 1 vs System 2, retrieval-as-tool, recuperar más grueso, rutear el
+  nivel de esfuerzo por query. (Sección 9)
 - "**¿Qué diferencia LangGraph, el Claude Agent SDK y el OpenAI Agents SDK?**" (Sección 10b)
   — awareness de alternativas, criterio de selección.
 

@@ -18,7 +18,8 @@ Cada ítem debe ser una **URL pública** que abre desde una ventana incógnito, 
       URL: ____
 - [ ] **2 blog posts publicados** — (1) eval methodology, (2) multi-tenancy isolation; cada uno
       con ≥1 número/gráfico tuyo. URLs: ____ / ____
-- [ ] **MCP server** — repo público con README claro + posteado en ≥1 canal. URL: ____
+- [ ] **MCP server** — repo público con README claro, verificado contra la especificación MCP
+      vigente (`2026-07-28`, ver `leccion.md` Sección 2) + posteado en ≥1 canal. URL: ____
 - [ ] **Sitio personal 1-página** — hub que enlaza todo en 1 click. URL: ____
 - [ ] **Video demo (Loom 3-5 min)** — flujo real + ≥1 número. URL: ____
 - [ ] **CV actualizado (PDF) + LinkedIn** — posicionamiento "AI Engineer", keywords ATS

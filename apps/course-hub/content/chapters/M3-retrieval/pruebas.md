@@ -55,8 +55,11 @@ Corren contra el harness de M2 y el golden dataset. El gate de mejora es **medid
    compensa. Decilo con *tu* medición: lo prendiste, corriste recall@5, y lo mantuviste solo si subió.
 
 6. **"¿Cohere rerank o cross-encoder self-hosted? ¿Por qué arrancaste con uno?"** — YAGNI: Cohere da
-   multilingüe y cero infra para validar que rerank mueve la aguja; migrás a self-hosted cuando el
-   volumen, el costo o el compliance B2B (no mandar datos a un tercero) lo justifican —*medido*.
+   multilingüe y cero infra para validar que rerank mueve la aguja (arrancás con `rerank-v4.0-fast`,
+   no `v3.5` — se apaga el 1-ago-2026); migrás a self-hosted cuando el volumen, el costo o el
+   compliance B2B (no mandar datos a un tercero) lo justifican —*medido*. Si te preguntan por
+   alternativas al self-hosted de siempre (`bge-reranker-v2-m3`), podés nombrar Qwen3-Reranker,
+   Jina v2 o ZeroEntropy como opciones más nuevas a benchmarkear.
 
 7. **"Mostrame el número."** — Tu tabla de recall@5: naive → hybrid → hybrid+rerank → +query
    transforms. El delta hybrid+rerank vs baseline es el corazón de tu defensa. Tenés que saberlo de
@@ -65,12 +68,16 @@ Corren contra el harness de M2 y el golden dataset. El gate de mejora es **medid
 8. **"¿Qué es MCP y por qué expusiste tu RAG como un MCP server?"** — Estándar abierto (Anthropic,
    2024) que resuelve el problema N×M de integraciones ("USB-C de la IA"); Tools/Resources/Prompts.
    Lo expusiste para desacoplar el core de retrieval de la API web y porque es señal de mercado de
-   crecimiento rápido (live, acumulando stars).
+   crecimiento rápido (live, acumulando stars). Si te preguntan si la spec es estable: no del todo —
+   el 28-jul-2026 sale una revisión grande que mueve el protocolo a stateless; no necesitás el
+   detalle técnico, pero sí saber que MCP sigue evolucionando activamente.
 
 9. **"¿Qué es DSPy y cuándo lo considerarías?"** *(awareness)* — Optimización programática de prompts:
    declarás el pipeline y un optimizer busca los prompts/few-shots que maximizan una métrica (la
    tuya, de M2), en vez de tunear a mano. Lo considerarías con muchos prompts encadenados y una
-   métrica clara, para reproducibilidad y evitar drift al cambiar de modelo.
+   métrica clara, para reproducibilidad y evitar drift al cambiar de modelo. Bonus si sabés que en
+   2026 ya no es un experimento chico (34k+ stars, ~160K descargas/mes) y que su optimizer central
+   hoy es **GEPA**.
 
 **Gate:** marcalo como pasado en el panel del módulo cuando (a) la capa 1 está verde en Grounded —
 en particular el test de no-regresión de recall y el MCP server respondiendo— y (b) escribiste tus

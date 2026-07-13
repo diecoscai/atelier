@@ -131,10 +131,18 @@ importan, y habrías diseñado un judge genérico que quizás no detecta *tu* ti
 
 ### 2.4 Confirmación canónica: "error analysis > infraestructura" (ene-2026)
 
-Esta posición no es la de este curso solo: es la conclusión de la encuesta de **Hamel Husain y
-Shreya Shankar** de enero 2026, respondida por 700+ engineers de Google, Microsoft, OpenAI, Meta,
-Amazon y otros. Su FAQ ("LLM Evals: Everything You Need to Know", hamel.dev/blog/posts/evals-faq)
-afila la posición sin ambigüedades:
+Esta posición no es la de este curso solo: es la conclusión de **Hamel Husain y Shreya Shankar**,
+tras enseñar su curso "AI Evals for Engineers & PMs" (Maven). Su FAQ ("LLM Evals: Everything You
+Need to Know", hamel.dev/blog/posts/evals-faq, actualizado 15-ene-2026) dice textualmente que el
+curso formó a **"700+ engineers & PMs"** — esa es la cifra exacta que cita la fuente primaria, sin
+desglose por empresa (el FAQ no menciona compañías puntuales; si viste una lista tipo "Google,
+Microsoft, OpenAI, Meta, Amazon" en otro lado, es de material de marketing, no del FAQ). Material
+de marketing más reciente del mismo curso (página de Maven y Lenny's Newsletter, 2026) ya habla de
+una cifra mayor y distinta: **"más de 2,000 PMs e ingenieros, y líderes de más de 500 empresas"** —
+usala si necesitás el número más grande y más actual, pero citando esa fuente y no el FAQ. El FAQ
+en sí es la síntesis de esa experiencia — no una encuesta formal con metodología publicada, sino la
+conclusión repetida de haber visto los mismos errores en cientos de equipos — y afila la posición
+sin ambigüedades:
 
 > *"La mayoría sobreinvierte en infraestructura de evals antes de entender qué errores comete
 > el sistema. Error analysis es LA actividad más importante."*
@@ -147,8 +155,9 @@ construyendo infraestructura para medir lo que no sabés que querés medir.
 > Porque las métricas solo significan algo si miden TUS modos de falla reales. Elegirlas antes es
 > tomarlas de un menú genérico sin saber si atacan tus problemas. Leés traces a mano para
 > *descubrir* cómo falla tu sistema (taxonomía), y recién entonces elegís/diseñás métricas y
-> judges que ataquen esas fallas concretas. Posición confirmada por 700+ engineers (Hamel/Shreya,
-> ene-2026).
+> judges que ataquen esas fallas concretas. Posición respaldada por Hamel Husain y Shreya Shankar
+> tras enseñar a "700+ engineers & PMs" (FAQ hamel.dev, ene-2026) — y, según marketing más reciente
+> del mismo curso, a 2,000+ personas y líderes de 500+ empresas.
 
 ---
 
@@ -325,6 +334,15 @@ porque es pytest-native — cada eval es un test, el gate falla como falla un te
 deja definir un judge alineado a tu taxonomía con un criterio en prosa. Los vas a usar juntos en
 `practica.md`.
 
+> **Nota de vigencia (ver `material-apoyo.md`):** la plataforma **OpenAI Evals** (el dashboard,
+> no el repo open-source) cierra el 30-nov-2026 (read-only desde el 31-oct-2026). OpenAI recomienda
+> **Promptfoo** como ruta de migración oficial desde ese dashboard — vale la pena conocerlo como
+> tercera opción con "bendición del vendor", aunque el stack de este curso (RAGAS + DeepEval +
+> Langfuse) no depende de OpenAI Evals y sigue siendo la elección del curso. DeepEval, por su
+> parte, saltó a la serie 4.x con un "Eval Harness for Coding Agents" — un desarrollo a tener en
+> el radar para cuando lleguemos a M6 (evals de agentes), sin que rompa nada de lo que usás acá.
+> Fijá versiones mínimas para reproducibilidad: `ragas>=0.4`, `deepeval>=4.0`, `langfuse>=3.0`.
+
 ```python
 # DeepEval — un eval ES un test de pytest. Esto es lo que lo hace ideal para el CI gate.
 import pytest
@@ -341,6 +359,8 @@ def test_rag_faithfulness(case):
         expected_output=case["ground_truth_answer"],
     )
     # Umbrales: el gate falla si bajan (sección 8). Judge barato y separado (sección 6.6).
+    # Pasá el modelo SIEMPRE explícito: el default interno de DeepEval 4.x ya no es gpt-4o-mini
+    # (pasó a un modelo de la serie GPT-5) — si omitís `model=`, el judge cambia sin que lo notes.
     assert_test(test_case, [
         FaithfulnessMetric(threshold=0.85, model="gpt-4o-mini"),
         ContextualRecallMetric(threshold=0.80, model="gpt-4o-mini"),
@@ -365,7 +385,7 @@ pasa/falla) con justificación.
 
 ```python
 # Un LLM-judge de FAITHFULNESS alineado a la taxonomía. Usa Claude (modelo barato y separado),
-# adaptive thinking para que razone el veredicto, y structured output para parsear sin frágil regex.
+# thinking para que razone el veredicto, y structured output para parsear sin frágil regex.
 import anthropic
 from pydantic import BaseModel
 
@@ -392,12 +412,14 @@ class Verdict(BaseModel):
 def judge_faithfulness(question: str, answer: str, context: str) -> Verdict:
     resp = client.messages.parse(
         model="claude-haiku-4-5",       # barato y SEPARADO del modelo de generación (6.6)
-        max_tokens=1024,
-        thinking={"type": "adaptive"},  # que razone el veredicto
+        max_tokens=2048,
+        # Haiku 4.5 NO soporta adaptive thinking (eso es Sonnet 5 / Opus 4.6+ / Fable 5) — usa el
+        # modo manual: budget_tokens < max_tokens, mínimo 1024. Ver nota debajo.
+        thinking={"type": "enabled", "budget_tokens": 1024},
         system=JUDGE_SYSTEM,
         messages=[{"role": "user", "content":
             f"PREGUNTA:\n{question}\n\nCONTEXTO:\n{context}\n\nRESPUESTA A EVALUAR:\n{answer}"}],
-        output_format=Verdict,
+        output_format=Verdict,  # atajo de conveniencia de .parse(); a nivel API es output_config.format
     )
     return resp.parsed_output
 ```
@@ -406,11 +428,22 @@ Fijate que el prompt del judge **codifica la taxonomía** (las reglas salen de l
 de la sección 2). Eso es alinear el judge a tus fallas — no un judge genérico de "¿está buena la
 respuesta?".
 
+> **Nota sobre el modelo del judge y `thinking`:** cada familia de modelos de Claude soporta un
+> modo de thinking distinto, y mezclarlos rompe en runtime. Haiku 4.5 (como Sonnet 4.5) solo acepta
+> el modo manual `{"type": "enabled", "budget_tokens": N}` — con `budget_tokens` estrictamente
+> menor a `max_tokens` y un mínimo de 1024 — o directamente sin `thinking`. El modo `{"type":
+> "adaptive"}` (donde el modelo decide cuánto pensar) solo existe en modelos más nuevos: Sonnet 4.6
+> y Sonnet 5, Opus 4.6 en adelante, y Fable 5. Si preferís adaptive thinking para el judge, usá uno
+> de esos modelos (ej. `claude-sonnet-5`) — sigue siendo "separado del generador" mientras el
+> generador de prod sea otro modelo; ya no sería el más barato de la familia, pero mantiene la
+> separación que evita self-preference bias (6.6).
+
 ### 6.2 Taxonomía: cuándo usás code-based vs LLM-based
 
 Antes de hablar de sesgos, la pregunta de diseño que va primero: **¿necesito un judge o alcanza
-con un check determinístico?** Hamel Husain y Shreya Shankar (FAQ ene-2026, 700+ engineers)
-distinguen dos tipos de evals y advierten contra mezclarlos sin criterio:
+con un check determinístico?** Hamel Husain y Shreya Shankar (FAQ ene-2026, destilado de enseñarle
+esto a 700+ engineers/PMs de 500+ empresas) distinguen dos tipos de evals y advierten contra
+mezclarlos sin criterio:
 
 - **Code-based (if/else / determinístico):** compara strings exactos, chequea si aparece una
   cita, cuenta tokens, verifica formato JSON, mide recall@k con IDs de ground truth. Barato,
@@ -472,6 +505,16 @@ Interpretación práctica:
 | 0.61–0.80 | Substancial — confiable para producción |
 | > 0.80 | Casi perfecto — muy bueno |
 
+*(Rangos de Landis & Koch, 1977 — el estándar más citado en la industria; Cohen's Kappa como tal
+lo introdujo Jacob Cohen en 1960. Ojo: Landis & Koch eligieron esos cortes por criterio propio, sin
+evidencia empírica que los respalde — otros papers usan rangos ligeramente distintos. Tratalos como
+guía práctica compartida por la industria, no como un estándar matemático absoluto.)* El ejemplo de
+abajo usa **Kappa no ponderado** (correcto para
+el caso binario faithful/unfaithful mostrado). Si tu golden set usa una escala ordinal con más de
+dos categorías (ej. agregás "borderline"), existe el **Kappa ponderado** (weighted), que penaliza
+menos los desacuerdos entre categorías adyacentes — considéralo si tu taxonomía crece más allá de
+sí/no.
+
 ```python
 # Calcular Cohen's Kappa sobre las etiquetas del judge vs las tuyas
 from sklearn.metrics import cohen_kappa_score
@@ -518,11 +561,27 @@ Dos reglas para el modelo del judge:
 
 1. **Barato.** Vas a correr el judge sobre 50+ casos en cada commit (CI). Usar el modelo top
    para juzgar es caro y lento, y para juzgar (tarea acotada con criterio claro) un modelo chico
-   alcanza. Por eso los ejemplos usan Haiku / gpt-4o-mini.
+   alcanza. Por eso los ejemplos usan Haiku 4.5 / `gpt-4o-mini`. Ojo con la vigencia de este
+   segundo: a mediados de 2026 OpenAI ya retiró toda la familia GPT-4o de ChatGPT y Custom GPTs, y
+   el lineup vigente de su API es la generación GPT-5.4/5.5 (los `gpt-5-mini`/`gpt-5-nano`
+   originales ya no figuran en su página de precios desde junio 2026). `gpt-4o-mini` sigue
+   disponible vía API sin fecha de retiro anunciada, pero es candidato de alto riesgo a ser el
+   próximo — si dejó de funcionar, buscá el equivalente barato vigente de esa generación (p. ej.
+   `gpt-5.4-mini` o el que exista al momento) en vez de asumir que seguirá disponible
+   indefinidamente. Claude Haiku 4.5 (lanzado 15-oct-2025) sigue siendo el Haiku más reciente de
+   Anthropic a mediados de 2026, sin reemplazo anunciado — no tiene el mismo riesgo de corto plazo.
 2. **Separado del generador.** El modelo que *juzga* debe ser distinto del que *genera* las
    respuestas en prod — idealmente de otra familia. Si el mismo modelo genera y se juzga, el
    self-preference bias contamina el resultado (se aprueba a sí mismo). Separar el judge es parte
    de hacer la evaluación honesta.
+
+> **Matiz de la guía oficial de OpenAI ("Evaluation best practices"):** arrancar el judge
+> directamente con el modelo más barato es un atajo que se paga después. La recomendación es
+> empezar con un modelo *fuerte* para el judge, validar su acuerdo con labels humanos (Cohen's
+> Kappa, 6.4), y **recién después** optimizar a un modelo barato si el acuerdo se sostiene. No
+> contradice las dos reglas de arriba — las reordena: primero validás que el criterio del judge
+> es correcto con un modelo que no tenga dudas de comprensión, y después bajás de nivel para el
+> gate de CI si el barato mantiene el mismo kappa.
 
 > **Checkpoint:** nombrá dos sesgos del LLM-judge y cómo los mitigás. ¿Cuándo usás code-based en
 > vez de LLM-based?
@@ -561,6 +620,20 @@ langfuse_context.score_current_trace(name="faithfulness", value=verdict.faithful
 
 El loop completo de mejora: **trace (Langfuse) → leer fallas → taxonomía → golden set → métricas
 + judge → medir → cambiar → re-medir.** Langfuse es la base de ese loop.
+
+> **Nota de versión:** el SDK de Python de Langfuse tiene una v3 basada en OpenTelemetry, que hoy
+> es el estándar recomendado (v2 sigue funcionando pero solo recibe parches de seguridad, sin
+> funcionalidad nueva). El decorador `@observe` que usás arriba sigue vigente en v3 — es una de las
+> tres formas documentadas de instrumentar, junto con un context manager y observaciones manuales
+> — así que el patrón de este código no cambia. Fijá `langfuse>=3.0` en tus dependencias y revisá
+> el quickstart actual de `langfuse.com/docs` antes de instalar, porque el detalle de imports puede
+> variar entre versiones. Un gotcha real de v3: si mezclás la instrumentación de Langfuse con otra
+> instrumentación OpenTelemetry genérica en el mismo proceso, podés terminar con "span explosion"
+> (muchos más spans de los que esperás) — y eso infla el volumen facturable si tu plan cobra por
+> observabilidad. Vigilalo si además instrumentás con OTel por tu cuenta. A mediados de 2026 ya
+> existe además una **v4** (con guía de migración oficial desde v2) que deprecó `update_trace()` —
+> si arrancás de cero, fijate en la documentación si conviene ir directo a v4; el patrón `@observe`
+> de este código sigue siendo válido en v3 y en v4.
 
 ---
 
@@ -615,6 +688,12 @@ Si atás el harness a RAG hoy, en M6 lo reescribís. Diseñalo agnóstico ahora 
 agent-eval (M6) se *cierra* sobre el harness de M2 — exactamente el gap que el bar de entrevistas
 castiga: *"¿cómo evaluás un agente, no solo una respuesta?"*. La respuesta es "con el mismo harness,
 porque lo diseñé agnóstico al componente".
+
+No es solo un ejercicio teórico: la industria se está moviendo hacia acá. DeepEval, por ejemplo,
+saltó a su serie 4.x con un "Eval Harness for Coding Agents" — integraciones con agentes de código
+y un flujo de patch → eval → retry pensado para trayectorias de agente, no solo respuestas. Cuando
+llegues a M6, el mismo harness que construiste acá (golden set, CI gate, dashboard) es la base
+sobre la que se para esa capa nueva de evaluadores.
 
 ---
 

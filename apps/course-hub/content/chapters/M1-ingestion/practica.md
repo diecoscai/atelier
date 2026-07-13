@@ -25,7 +25,9 @@ aceptación concreto). No avances sin que el actual verifique.
 ## Paso 1 — Elegir parser y aislar la decisión detrás de una interfaz
 **Hacer:**
 - Agregá la dependencia elegida: `uv add docling` (default recomendado) — o `uv add
-  "unstructured[pdf]"` si tu mix de inputs lo pide.
+  "unstructured[pdf]"` si tu mix de inputs lo pide. Docling tiene cadencia de releases rápida:
+  **pineá la versión** en el lockfile (`uv.lock`) en vez de dejarla flotante, porque
+  `HybridChunker`/`TableFormer` pueden cambiar de API entre versiones menores.
 - Definí un contrato estable para no acoplar el resto del código al parser:
 
 ```python
@@ -105,7 +107,10 @@ async def embed_all(chunks: list[Chunk], concurrency: int = 8) -> list[Chunk]:
 ```
 
 **Verificar:** ingerir un doc de ~30 chunks tarda *notablemente* menos que serial (cronometralo:
-`time`); todas las filas tienen embedding de dim 1536. Sin errores de rate-limit.
+`time`); todas las filas tienen embedding de la dimensión que corresponde a tu modelo (1536 si
+usás `text-embedding-3-small`; anotá cuál es la tuya si usás otro proveedor — Gemini, Voyage y
+Cohere default a otras dimensiones y muchos soportan truncar vía MRL). Sin errores de
+rate-limit.
 
 ## Paso 5 — Endpoint `/ingest` actualizado
 **Hacer:** `POST /ingest` recibe un archivo (PDF/HTML/imagen), detecta el tipo y orquesta
@@ -117,8 +122,9 @@ detectás y lo logueás).
 
 ## Paso 6 — ⊕ Graft multimodal: ingerir screenshots
 **Hacer:**
-- Si el archivo es imagen, en vez de `parse` de texto, llamá a un modelo de **visión** (GPT-4o
-  o Claude con visión) para describirla (prompt de la lección, Sección 6).
+- Si el archivo es imagen, en vez de `parse` de texto, llamá a un modelo de **visión** vigente
+  (familia GPT-5.x/`gpt-4o` o Claude con visión) para describirla (prompt de la lección,
+  Sección 6).
 - La descripción entra al pipeline como un `Element` con `element_type = "image_caption"` y
   `source` = nombre de la imagen → se chunkea/embebe/guarda como cualquier texto.
 

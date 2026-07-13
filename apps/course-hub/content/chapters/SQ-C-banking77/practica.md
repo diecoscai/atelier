@@ -12,18 +12,31 @@ sepas *leer* las métricas y argumentar si el clasificador sirve como router. M9
 Grounded; acá construís y medís el fundamento.
 
 ## Pre-requisitos
-- Python con `scikit-learn`, `datasets` (Hugging Face), y `matplotlib` (para la matriz).
-  Notebook o Colab.
+- Python con `scikit-learn>=1.9.0`, `datasets>=5.0.0` (Hugging Face), y `matplotlib` (para la
+  matriz). Notebook o Colab.
 - Leíste los ★ Core de `material-apoyo.md` y podés explicar precision vs recall sin mirar.
 
 ---
 
 ## Paso 1 — Cargar Banking77
-**Hacer:** cargá `PolyAI/banking77` con la librería `datasets`. Usá los splits train/test que ya
-trae el dataset.
+**Hacer:** cargá el dataset con `datasets`. **No uses `PolyAI/banking77` directo** — todavía usa
+un loading script que `datasets` rechaza desde la versión 4.0.0 en adelante (incluida la 5.0.0
+recomendada en `material-apoyo.md`) con `RuntimeError: Dataset scripts are no longer supported`.
+Usá el mirror ya migrado a Parquet:
 
-**Verificar:** imprimís unas frases con su intent; sabés cuántas clases (77) y cuántos ejemplos
-hay por split. Mirás si las clases están balanceadas o no (importa para elegir métrica).
+```python
+from datasets import load_dataset
+
+ds = load_dataset("mteb/banking77")  # mismos 77 intents, ya en Parquet
+train, test = ds["train"], ds["test"]
+```
+
+Usá los splits `train`/`test` que ya trae.
+
+**Verificar:** imprimís unas frases con su intent (columnas `text`/`label_text`); sabés cuántas
+clases (77) y cuántos ejemplos hay por split (train ~9,990 / test 3,080 en este mirror — el
+conteo exacto puede variar levemente respecto al original según cómo se re-splitee). Mirás si
+las clases están balanceadas o no (importa para elegir métrica).
 
 ## Paso 2 — Vectorizar + entrenar
 **Hacer:** vectorizá las frases (arrancá con `TfidfVectorizer`; opcional: probá embeddings como

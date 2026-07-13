@@ -13,7 +13,10 @@ Objetivo: subir 1 documento y poder preguntarle, de punta a punta, deployado. Ca
 > solo lo *sigue* vía `course.json`.
 
 ## Pre-requisitos
-- Node 20+, pnpm, Python 3.11+, `uv`, Docker (para Postgres local).
+- **Node 22+** (24 LTS si arrancás un proyecto nuevo hoy), pnpm, **Python 3.12+** (3.13 también
+  sirve), `uv`, Docker (para Postgres local).
+  > Node 20 llegó a EOL en marzo 2026 y ya no alcanza igual: el Vercel AI SDK 7 (el que vas a
+  > usar en el Paso 4) exige Node 22+ como requisito duro.
 - Una API key de OpenAI.
 - Leíste los ★ Core de `material-apoyo.md` y podés explicar embeddings sin mirar.
 
@@ -21,8 +24,11 @@ Objetivo: subir 1 documento y poder preguntarle, de punta a punta, deployado. Ca
 
 ## Paso 1 — Monorepo + Postgres con pgvector
 **Hacer:**
-- Estructura: `apps/web` (Next.js + Vercel AI SDK) y `services/api` (FastAPI con `uv`).
-- Levantá Postgres con pgvector vía Docker (imagen `pgvector/pgvector:pg16`).
+- Estructura: `apps/web` (Next.js + Vercel AI SDK 7) y `services/api` (FastAPI con `uv`).
+- Levantá Postgres con pgvector vía Docker. Pineá la imagen completa, no un tag flotante:
+  `pgvector/pgvector:pg17-v0.8.5` (o `pg18-v0.8.5` si querés ir a la última mayor de Postgres).
+  `pgvector/pgvector:pg16` sin versión de pgvector puede recibir actualizaciones silenciosas del
+  paquete `pgvector` y romperte el build sin aviso.
 - Creá la extensión y la tabla `chunks` (ver SQL en la lección, Sección 4).
 
 **Verificar:** `psql` → `SELECT '[1,2,3]'::vector;` no da error. La tabla `chunks` existe.
@@ -58,7 +64,8 @@ Preguntás algo no cubierto → dice que no lo encuentra (no inventa).
 ## Paso 4 — Frontend: upload + chat con streaming (capa Producto)
 **Hacer:** en `apps/web`, UI mínima: un input para subir el doc (→ `/ingest`) y un chat
 (Vercel AI SDK, `useChat`) que consuma el stream de `/chat` y pinte los tokens a medida que
-llegan.
+llegan. Pineá la versión exacta en `package.json` (ej. `"ai": "^7.0"`) — no dejes `@latest`
+suelto, así un major nuevo del SDK no te rompe el build sin que lo veas venir.
 
 **Verificar:** en el browser, subís → preguntás → ves la respuesta *aparecer token por token*.
 

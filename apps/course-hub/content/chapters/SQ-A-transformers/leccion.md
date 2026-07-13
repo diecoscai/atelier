@@ -106,6 +106,15 @@ bloques (GPT-2 small: 12). Cada capa refina: las primeras capturan patrones loca
 las profundas, semántica y razonamiento. Al final, una proyección a todo el vocabulario + softmax
 da la probabilidad de cada token siguiente.
 
+> **GPT-2 es el esqueleto, no el estado del arte.** Sirve como referencia porque es el punto
+> donde Karpathy ancla la lecture y porque el mecanismo que importa (Q/K/V, multi-head,
+> residual + layer norm) es el mismo en cualquier Transformer moderno. Lo que cambia en
+> producción hoy: *positional encoding* casi siempre vía RoPE (rotary) en vez de embeddings
+> sumados, *grouped-query attention* para abaratar el KV-cache, y en varios modelos grandes,
+> capas MoE en lugar de un MLP denso por bloque. Ninguno de esos cambios afecta lo que tenés que
+> saber explicar acá — son optimizaciones sobre el mismo esqueleto — pero no digas "así es GPT-4
+> / Claude" en una entrevista: son arquitecturas mucho más grandes y con esas variantes encima.
+
 **Causal masking:** en generación, un token solo puede mirar *hacia atrás* (no puede ver el
 futuro que todavía no generó). Se logra tapando las attentions hacia adelante antes del softmax.
 

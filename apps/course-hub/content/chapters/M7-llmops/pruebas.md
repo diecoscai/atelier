@@ -15,7 +15,7 @@ optimización se acompaña de "y la calidad aguantó".
       (`"compará Enterprise vs Pro para 200 usuarios con SSO"`) clasifica `complex`. Sin esto, todo
       el ahorro de routing es ruido.
 - [ ] **El routing baja el costo sin romper la calidad (el HARD GATE de costo):** corrido el golden
-      set con el router prendido vs el baseline (todo a `gpt-4o`), el **costo de generación baja**
+      set con el router prendido vs el baseline (todo a `MODEL_FRONTIER`, sin routing), el **costo de generación baja**
       (delta negativo, medible en Langfuse) **y** la métrica de calidad cae ≤ tu umbral aceptado.
       El test falla si el costo no baja o si la calidad cae de más. Este es el número que valida la
       palanca #1.
@@ -32,7 +32,7 @@ optimización se acompaña de "y la calidad aguantó".
       no señal).
 - [ ] **Observabilidad presente:** un trace de `/chat` en Langfuse expone costo, tokens, TTFT y la
       etiqueta `prompt_version`. Smoke: el dashboard muestra costo por tenant y p95.
-- [ ] **El swap a Ollama funciona y está medido:** el golden set corre contra `llama3.1:8b` local
+- [ ] **El swap a Ollama funciona y está medido:** el golden set corre contra `qwen3:8b` local
       cambiando solo `base_url`/modelo, y produce la tabla comparativa (calidad local vs API, TTFT de
       cada uno). El pipeline no se reescribió.
 - [ ] **`/chat` sigue end-to-end:** con router + cache + budget activos, el endpoint sigue

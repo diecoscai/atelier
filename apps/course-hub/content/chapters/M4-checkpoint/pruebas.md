@@ -5,6 +5,12 @@ gate: pending
 
 # Pruebas — M4 (HIREABLE CHECKPOINT)
 
+> Revisado en la misma pasada de verificación de julio 2026 que `leccion.md` / `material-apoyo.md` /
+> `practica.md`. Estos criterios no dependen de versiones de librería o API externa, así que no
+> tienen claims con fecha de vencimiento — pero si algo del código de ejemplo referenciado (Instructor,
+> logprobs, JWT) cambia en esos archivos, revisá que los asserts de acá sigan describiendo el mismo
+> comportamiento.
+
 ## Capa 1 — tests automatizados (prueban que *funciona*)
 
 > El más importante de todo el módulo es el **test de aislamiento cross-tenant**. Sin él verde en

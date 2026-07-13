@@ -17,8 +17,15 @@ cuando un paso depende del anterior, y que **cada cambio del grafo se mida** por
 ## Pre-requisitos
 - M3 (hybrid retrieval + rerank) y M4 (citations, "no sé" calibrado) andando y testeados.
 - El harness de eval de M2 corriendo en CI (pytest + golden dataset + Langfuse).
-- `uv add langgraph langchain-core`. API key del LLM (router/decompose/judge usan el modelo barato
-  de M2; el answer agent usa el de generación).
+- `uv add "langgraph>=1.0" "langchain-core>=1.0"`. Pineá la versión mayor: LangChain/LangGraph
+  llegaron a v1.0 en oct-2025 y deprecaron el prebuilt `create_react_agent` / `AgentExecutor` en
+  favor de `create_agent` — este módulo usa `StateGraph` a mano (no esos prebuilts), pero si
+  instalás sin pin podés terminar con ejemplos de tutoriales viejos que no aplican a v1. API key
+  del LLM (router/decompose/judge usan el modelo barato de M2; el answer agent usa el de
+  generación). **Nota de currency (jul-2026):** `claude-haiku-4-5` sigue vigente sin reemplazo más
+  nuevo — es la elección correcta para router/decompose/judge. Si el `path_judge` del Paso 7 te da
+  veredictos poco confiables con Haiku, **Sonnet 5** es el escalón intermedio a probar antes de
+  saltar a Opus: calidad cercana a Opus en tareas agentic a precio de Sonnet.
 - Leíste los ★ Core de `material-apoyo.md` y podés explicar agent vs chain sin mirar.
 
 ---
@@ -219,8 +226,9 @@ está cerrado.
   - **ADR-M6-b:** "Multi-agent: 2 agentes + economía" — el beneficio concreto (evaluabilidad +
     enfoque separados), la mejora medida en eval que justifica el ~15x de costo tokens, por qué
     *no* más de 2, cuándo lo colapsarías a uno.
-  - **ADR-M6-c:** "Reasoning-RAG / System 1 vs System 2" — cómo adaptarías el pipeline para o3 /
-    extended thinking / Gemini 2.5 (retrieval-as-tool, recuperar más grueso, rutear por modelo) y
+  - **ADR-M6-c:** "Reasoning-RAG / System 1 vs System 2" — cómo adaptarías el pipeline para un
+    modelo con razonamiento adaptativo activo (`effort` alto en Claude, o equivalente en GPT-5.x /
+    Gemini 3): retrieval-as-tool, recuperar más grueso, rutear el nivel de esfuerzo por query. Y
     por qué hoy seguís en System 1 por costo/latencia. Taggealos `Module: M6`.
 - Respondé los **defense drills** (`pruebas.md`, capa 2) por escrito, con tus números.
 - Actualizá `course.json` (status `shipped`, tests, links al grafo y a la trajectory eval).

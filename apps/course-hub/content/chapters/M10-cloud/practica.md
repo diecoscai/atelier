@@ -19,13 +19,18 @@ hacer** y **cómo verificar**. No avances sin que el actual verifique.
 - Dockerfile de `services/api` que escucha en `$PORT` y en `0.0.0.0` (ver `leccion.md` §2).
 - Una cuenta de GCP **o** AWS con free tier / créditos. `gcloud` **o** `aws` CLI instalado y
   autenticado. `terraform` instalado.
-- Para vLLM: acceso a una GPU prestada (Colab con runtime T4, o RunPod ~$0.3-0.5/h una T4/A10).
+- Para vLLM: acceso a una GPU prestada (Colab con runtime T4, o una GPU económica de RunPod — su
+  catálogo cambia seguido, así que no te fijes en un modelo puntual: mirá `runpod.io/pricing` y
+  elegí la opción más barata disponible en el momento, típicamente en el rango de ~$0.15-0.30/h
+  para una GPU de entrada tipo L4/RTX 4000).
 - Leíste los ★ Core de `material-apoyo.md`; podés explicar PagedAttention y los 4 tiers del AI Act
   sin mirar.
 
 > **Elegí UN cloud y un solo runtime serverless.** Los pasos muestran **GCP Cloud Run** (camino
-> recomendado, IaC más simple). Si elegís **AWS App Runner**, el flujo es análogo (ECR en vez de
-> Artifact Registry, Secrets Manager en vez de Secret Manager). No hagas los dos.
+> recomendado, IaC más simple). Si elegís AWS, usá **ECS Express Mode** si estás arrancando de
+> cero (App Runner está en maintenance mode desde abr-2026 y no acepta cuentas nuevas — ver
+> `leccion.md` §2). El flujo es análogo (ECR en vez de Artifact Registry, Secrets Manager en vez
+> de Secret Manager). No hagas los dos clouds.
 
 ---
 

@@ -4,6 +4,11 @@ module: M4
 
 # Criterios de defensa — M4 (HIREABLE CHECKPOINT)
 
+> Revisado en la misma pasada de verificación de julio 2026 que el resto del módulo. Los criterios
+> de defensa acá son conceptuales (aislamiento, structured outputs, calibración) y no dependen de
+> una versión de librería puntual, así que no envejecen igual — pero si un drill referencia un
+> número o comando concreto de `leccion.md`/`practica.md`, confirmá que sigue siendo el mismo.
+
 Al terminar M4 tenés que poder, en el nivel honesto indicado. M4 es el checkpoint: el listón es
 *can-defend-in-system-design* en los temas core (aislamiento, structured outputs, trust), no solo
 *can-explain*.

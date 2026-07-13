@@ -12,8 +12,8 @@ duration: ~8-10h lectura + 1 finde de práctica
 > **model routing por complejidad**, **semantic caching**, **token/context budgets** y
 > **observabilidad** (TTFT, p50/p95, costo por conversación). Vas a poder defender, con un
 > número de *tu* sistema, cuánto baja el costo cada palanca. Y vas a hacer el **swap a un modelo
-> open-source self-hosted (Ollama / Llama 3.1)** para mostrar que no dependés de un vendor — y
-> saber exactamente cuándo conviene y cuándo no.
+> open-source self-hosted (Ollama / Qwen3 — la referencia local 2026, o Llama/Gemma/Phi)** para
+> mostrar que no dependés de un vendor — y saber exactamente cuándo conviene y cuándo no.
 
 > **Pre-requisito mental:** este módulo solo tiene sentido porque en M2 construiste el harness de
 > evals. Cada optimización de costo es un **trade-off contra calidad**, y "bajé el costo 70%" sin
@@ -32,18 +32,23 @@ con riesgo de margen. Si un cliente manda 10x más queries de lo que asumiste, o
 crecen sin control, tu COGS (cost of goods sold) se come la ganancia y no te enterás hasta que ves
 la factura de OpenAI a fin de mes.
 
-Hagamos el número, porque en la entrevista lo van a pedir. Supongamos un modelo frontier a ~$2.50
-/ 1M tokens de input y ~$10 / 1M de output (los precios cambian con cada generación; lo que no
-cambia es el método). Una conversación de soporte típica con RAG:
+Hagamos el número, porque en la entrevista lo van a pedir. A julio 2026 el frontier vigente de
+OpenAI es **GPT-5.6 Sol** a ~$5 / 1M tokens de input y ~$30 / 1M de output (los precios cambian con
+cada generación — cuando leas esto probablemente ya sean otros; lo que no cambia es el método: consultá
+siempre `developers.openai.com/api/docs/pricing` para los números vigentes). Una conversación de
+soporte típica con RAG:
 
 - **Input por turno:** instrucción + 5 chunks recuperados (~2.000 tokens) + historial (~1.000) ≈
   **3.000 tokens de input**.
 - **Output:** una respuesta de ~300 tokens.
-- **Costo por turno:** `3000/1M × $2.50 + 300/1M × $10 = $0.0075 + $0.003 = ~$0.0105`.
+- **Costo por turno:** `3000/1M × $5 + 300/1M × $30 = $0.015 + $0.009 = ~$0.024`.
 
 Parece nada. Pero multiplicá: **1.000 tenants × 50 conversaciones/día × 4 turnos = 200.000
-turnos/día = ~$2.100/día = ~$63.000/mes**. Si vendés el plan a $99/tenant, facturás $99.000/mes y
-**dos tercios se van en inferencia**. El producto técnicamente "funciona" y el negocio no cierra.
+turnos/día = ~$4.800/día = ~$144.000/mes**. Si vendés el plan a $99/tenant, facturás $99.000/mes —
+**el costo de inferencia solo, corriendo todo en el frontier, ya supera el ingreso**. El negocio no
+solo pierde margen: pierde plata en cada conversación. Esa es la urgencia real detrás de este
+módulo, y por qué "rutear todo al modelo caro" no es una opción defendible ni con el frontier de
+hoy ni con el de mañana.
 
 Las cuatro palancas de este módulo atacan ese número desde ángulos distintos y **se componen**
 (multiplican, no suman):
@@ -74,12 +79,22 @@ residency en la UE, y decime si me conviene migrar" necesita razonamiento multi-
 frontier**. Pagar el modelo frontier para *toda* query es como mandar a un cirujano a poner una
 curita: funciona, pero el costo es absurdo.
 
-La diferencia de precio entre un modelo frontier y su variante barata del mismo proveedor es
-**20-30x** — una constante que se mantiene independientemente de qué generación de modelos estés
-mirando. Si el 70-80% de tus queries son "simples" (y en soporte lo son: FAQ, lookups,
-confirmaciones), rutear esas al modelo barato te ahorra el grueso del costo de generación
-**sin tocar la calidad percibida** — porque para esas queries el modelo barato responde igual de
-bien.
+La diferencia de precio entre un modelo frontier y su variante barata **de la misma generación**
+del mismo proveedor no es una constante — hay que medirla cada vez. Con GPT-5.6: Sol (frontier)
+cuesta $30/1M de output y Luna (el tier barato de esa misma generación) cuesta $6/1M de output —
+eso es **5x**, comparando output contra output. El 20-30x que quizás viste citado en otro lado
+aparece solo si cruzás generaciones distintas (ej. Sol de GPT-5.6 contra `nano` de GPT-5.4, que
+cuesta $1.25/1M de output — ahí sí da ~24x), pero eso ya no es "frontier vs mini de la misma
+camada": es comparar dos catálogos distintos, y no es el ejercicio que querés hacer para decidir tu
+router. Además, desde GPT-5 el "frontier vs mini" binario ya no describe bien el catálogo: OpenAI
+corre **3+ tiers de precio por generación** (Sol / Terra / Luna en GPT-5.6; `nano` es un tier
+aparte, de la generación GPT-5.4, no un cuarto escalón de 5.6). El ejercicio correcto no es
+"memorizar un ratio" — es, en *esa* generación, comparar el tier que vas a usar de "barato" contra
+el que vas a usar de "caro" y sacar el número vigente. Si el 70-80% de tus queries son "simples" (y
+en soporte
+lo son: FAQ, lookups, confirmaciones), rutear esas al tier barato te ahorra el grueso del costo de
+generación **sin tocar la calidad percibida** — porque para esas queries el modelo barato responde
+igual de bien.
 
 El patrón 2026 más completo combina **benchmarking de calidad/latencia/costo** con el harness de
 M2 para decidir qué modelo entra en producción, y **distillation** como técnica complementaria:
@@ -115,7 +130,8 @@ const ROUTER_PROMPT = `Clasificá la consulta de soporte como "simple" o "comple
 Respondé SOLO con el JSON {"complexity": "simple"|"complex"}.`;
 
 // Reemplazá con los IDs de modelo vigentes del proveedor que uses
-// (ej. modelo-barato = tier mini/haiku/flash; modelo-frontier = tier caro)
+// (a julio 2026: MODEL_CHEAP ~ "gpt-5.6-luna" o "gpt-5.4-nano" para clasificar;
+// MODEL_FRONTIER ~ "gpt-5.6-sol". Verificá developers.openai.com/api/docs/models: la lista rota.)
 const MODEL_BY_COMPLEXITY: Record<Complexity, string> = {
   simple: process.env.MODEL_CHEAP!,    // modelo barato del proveedor actual
   complex: process.env.MODEL_FRONTIER!, // modelo frontier del proveedor actual
@@ -175,6 +191,16 @@ El mecanismo concreto (OpenAI):
   de cache hit cuesta ~$X/2.
 - **Extended caching hasta 24 horas**: el cache persiste el tiempo suficiente para workflows
   de producción continuos.
+- **Los cache *writes* ya no son gratis (GPT-5.6+).** En generaciones anteriores, la primera vez
+  que se escribía un prefijo en cache no tenía costo extra. Desde GPT-5.6, OpenAI cobra el write a
+  **1.25x el precio de input estándar** — hay que sumarlo al ROI. Para un prefijo estable (system
+  prompt que no cambia) sigue siendo un win claro: pagás el 1.25x una vez y cobrás 50% de descuento
+  en cada hit sucesivo. Para prefijos que rotan seguido, el break-even se corre — medilo, no lo
+  asumas.
+- **`prompt_cache_breakpoint` (GPT-5.6+).** Antes dependías solo del hash automático de los
+  primeros ~256 tokens. Ahora podés marcar manualmente el punto de corte del prefijo a cachear,
+  útil cuando tu prompt tiene un límite lógico (ej. "hasta acá system + docs, de acá query") que no
+  coincide con los primeros tokens exactos.
 
 El layout correcto: **contenido estable al principio del prompt, variable al final**.
 
@@ -242,6 +268,10 @@ CREATE TABLE semantic_cache (
 
 CREATE INDEX ON semantic_cache USING hnsw (query_embedding vector_cosine_ops);
 ```
+
+(pgvector 0.8.x agrega parallel HNSW builds, `halfvec` para embeddings de media precisión con ~50%
+menos storage, e iterative scans para queries filtradas — mejoras de rendimiento que valen la pena
+si el semantic cache escala a producción con volumen alto.)
 
 El flujo de lookup, antes de llamar al LLM:
 
@@ -327,10 +357,14 @@ error caro por dos razones que se refuerzan:
    costo de input por turno — para siempre, en cada query. Eso es **economía negativa**: gastás más
    por una mejora marginal (o negativa) de calidad.
 2. **Más contexto no es más calidad — frecuentemente es menos.** El paper *Lost in the Middle*
-   (Liu et al., el de M0) mostró que los modelos **ignoran la información en el medio** de contextos
-   largos. Meter 20 chunks puede *empeorar* la respuesta respecto a meter los 5 mejores: enterrás la
-   señal en ruido. Pagás 4x para que el modelo responda peor. Por eso el rerank de M3 existe — para
-   poner los pocos chunks que importan arriba, no para poder meter más.
+   (Liu et al. 2023, el de M0) mostró que los modelos **ignoran la información en el medio** de
+   contextos largos. Meter 20 chunks puede *empeorar* la respuesta respecto a meter los 5 mejores:
+   enterrás la señal en ruido. Pagás 4x para que el modelo responda peor. El hallazgo sigue vigente
+   en 2026 incluso en modelos con ventanas de 1M+ tokens (benchmarks de seguimiento como RULER y
+   HELMET lo confirman), y hoy hay una explicación arquitectónica y no solo empírica: el decaimiento
+   de largo plazo de RoPE reduce la similitud entre tokens distantes, y softmax amplifica ese efecto.
+   Ningún modelo de producción eliminó el sesgo de posición del todo. Por eso el rerank de M3 existe
+   — para poner los pocos chunks que importan arriba, no para poder meter más.
 
 La regla: **el context window es un presupuesto que administrás, no un balde que llenás**.
 
@@ -343,7 +377,10 @@ costo y dar una palanca de monetización (el plan caro tiene más context budget
 # services/api/budget.py
 import tiktoken
 
-enc = tiktoken.encoding_for_model("gpt-4o")  # o el modelo que uses — tiktoken cubre los modelos OpenAI
+# tiktoken suele ir atrás agregando el alias exacto de cada modelo nuevo (hay issues abiertos
+# del estilo "encoding_for_model('gpt-5.x') falla"). Más robusto: resolver por ENCODING, no por
+# nombre de modelo. Todos los GPT-4o/GPT-5.x usan o200k_base.
+enc = tiktoken.get_encoding("o200k_base")
 
 def count_tokens(text: str) -> int:
     return len(enc.encode(text))
@@ -392,9 +429,14 @@ Tres prácticas más de budget que valen oro:
 Pusiste el sistema en `recall@5 = 0.89` y respuestas que el judge de M2 aprueba. Tres meses después,
 sin que toques nada, la calidad bajó. ¿Por qué?
 
-- **El proveedor cambió el modelo por debajo.** Los aliases de modelo (ej. `"gpt-4o"` o cualquier
-  alias sin versión fijada) apuntan a versiones que rotan; un upgrade silencioso puede cambiar el
-  comportamiento de tus prompts (a veces mejor, a veces peor para *tu* caso particular).
+- **El proveedor cambió el modelo por debajo — o lo retiró.** Los aliases de modelo (ej.
+  `"gpt-4o"` o cualquier alias sin versión fijada) apuntan a versiones que rotan; un upgrade
+  silencioso puede cambiar el comportamiento de tus prompts (a veces mejor, a veces peor para *tu*
+  caso particular). El caso extremo ya pasó en este curso: `gpt-4o` y `gpt-4o-mini`, los modelos que
+  este módulo usaba como ejemplo hasta hace poco, fueron retirados de ChatGPT en febrero 2026 y
+  quedan solo como legacy en la API directa. Si tu código hardcodeó el nombre en vez de una variable
+  de entorno (`MODEL_CHEAP`/`MODEL_FRONTIER`, como en §2), un retiro así te rompe producción sin
+  aviso.
 - **Cambió la distribución de queries.** Tus clientes empezaron a preguntar sobre una feature nueva
   que tu doc no cubre bien. El sistema no cambió; el mundo sí.
 - **Tocaste un prompt** "para mejorar algo" y rompiste otra cosa sin medirlo.
@@ -460,21 +502,26 @@ open-source es **Langfuse** (que ya introdujiste en M2 para evals — acá la us
 ### Cómo: instrumentar con Langfuse
 
 Langfuse envuelve tus llamadas y arma un **trace** jerárquico (una conversación) con **observations**
-anidadas (cada llamada al LLM, con su costo, tokens y latencia calculados automáticamente):
+anidadas (cada llamada al LLM, con su costo, tokens y latencia calculados automáticamente). Usá
+**Python SDK ≥4.0** (o JS/TS ≥5.0) — es el rewrite que Langfuse hizo GA en marzo 2026; la API vieja
+(`update_current_trace()`) está deprecada a favor de `propagate_attributes()`, y por default el SDK
+v4 ya no exporta *todos* los spans de OpenTelemetry, solo los de LLM, así que si necesitás ver spans
+de DB/HTTP en el trace hay que habilitarlo explícito:
 
 ```python
-# services/api/llm.py
+# services/api/llm.py — Langfuse Python SDK v4+
 from langfuse.openai import openai  # drop-in: envuelve el cliente de OpenAI
-from langfuse import observe
+from langfuse import observe, propagate_attributes
 
 @observe()  # crea un trace por turno de conversación
 async def answer(query: str, tenant_id: int, prompt_version: str):
-    # el wrapper captura model, tokens, costo y latencia de cada llamada solo
-    res = await openai.chat.completions.create(
-        model=os.environ["MODEL_CHEAP"],  # el modelo vigente del proveedor que uses
-        messages=[...],
-        metadata={"tenant_id": tenant_id, "prompt_version": prompt_version},  # para A/B y costo por tenant
-    )
+    # propagate_attributes reemplaza a update_current_trace() (deprecado en v4)
+    with propagate_attributes(tenant_id=str(tenant_id), prompt_version=prompt_version):
+        # el wrapper captura model, tokens, costo y latencia de cada llamada solo
+        res = await openai.chat.completions.create(
+            model=os.environ["MODEL_CHEAP"],  # el modelo vigente del proveedor que uses
+            messages=[...],
+        )
     return res
 ```
 
@@ -489,7 +536,7 @@ final: es el instrumento que hace medibles a las otras cuatro palancas.**
 
 ---
 
-## 8. ⊕ Graft open-source: swap a Ollama (Llama 3.1 / Mistral)
+## 8. ⊕ Graft open-source: swap a Ollama (Qwen / Llama / Gemma / Phi)
 
 ### Por qué hacer este graft
 
@@ -504,14 +551,24 @@ Dos razones, una técnica y una de mercado:
 
 ### Cómo: Ollama hace el swap trivial
 
-**Ollama** corre modelos open-source (Llama 3.1, Mistral, Phi, Gemma) localmente y — clave — expone
-una **API compatible con OpenAI**. Eso significa que swappear es cambiar la `baseURL` y el nombre del
-modelo, sin reescribir tu código:
+**Ollama** corre modelos open-source localmente y — clave — expone una **API compatible con
+OpenAI** (endpoint que Ollama marca como experimental en su propia doc, pero estable hace tiempo y
+sin señales de discontinuación: en julio 2026 cerró una ronda Series B de $65M que lleva el total
+levantado a $88M). Eso significa que swappear es cambiar la `baseURL` y el nombre del modelo, sin
+reescribir tu código.
+
+Sobre *qué* modelo correr: la familia Llama de Meta ya no es el default de la comunidad. El
+flagship vigente de Meta es **Llama 4** (Scout/Maverick/Behemoth, MoE nativo multimodal, abr 2025),
+pero Scout necesita una GPU de gama alta, no una laptop de estudiante. Para correr algo competitivo
+*localmente*, el consenso 2026 ya no es "bajá un Llama" — es **Qwen3** (8B, o el MoE 30B-A3B si
+tenés ~24 GB), con **Gemma 3 4B** o **Phi-4-mini** como alternativas livianas si el objetivo es
+footprint mínimo. Si igual querés mantener la marca Llama por reconocimiento en la entrevista, la
+opción liviana es **Llama 3.2 3B** (no Llama 3.1 8B, que ya quedó dos generaciones atrás):
 
 ```bash
 # instalás y bajás un modelo (descarga los pesos cuantizados, ver sidebar)
-ollama pull llama3.1:8b
-ollama run llama3.1:8b "hola"   # prueba rápida; sirve en http://localhost:11434
+ollama pull qwen3:8b
+ollama run qwen3:8b "hola"   # prueba rápida; sirve en http://localhost:11434
 ```
 
 ```python
@@ -525,7 +582,7 @@ local = AsyncOpenAI(
 
 async def answer_local(messages):
     return await local.chat.completions.create(
-        model="llama3.1:8b",
+        model="qwen3:8b",
         messages=messages,
     )
 ```
@@ -539,7 +596,7 @@ SDK propietario, sería un refactor.
 El graft no es "corrí Llama". Es **medir el trade-off de tres ejes** con *tu* harness y *tu* dataset,
 y poder defenderlo:
 
-| | Modelo barato del proveedor (API) | Llama 3.1 8B (Ollama, local) |
+| | Modelo barato del proveedor (API) | Qwen3 8B (Ollama, local) |
 |---|---|---|
 | **Costo** | precio del tier barato del proveedor (varía por generación) | $0 marginal por token, pero **pagás el GPU/hora** (amortizable solo con volumen) |
 | **Calidad** (golden set de M2) | tu número, ej. 0.89 | tu número, ej. 0.81 — **medilo, no lo asumas** |
@@ -561,15 +618,16 @@ decisión"*. Eso es exactamente lo que un entrevistador quiere oír.
 
 ## Sidebar — Quantization primer (awareness)
 
-Cuando hiciste `ollama pull llama3.1:8b`, bajaste un modelo **cuantizado**. Vale entender qué es,
+Cuando hiciste `ollama pull qwen3:8b`, bajaste un modelo **cuantizado**. Vale entender qué es,
 porque es la pregunta de "¿cómo corrés un modelo grande en hardware modesto?".
 
 - **Qué es.** Los pesos de un modelo se entrenan en **FP16** (16 bits por número). Quantization es
   **representarlos con menos bits** — INT8 (8 bits), INT4 (4 bits) — para que el modelo ocupe menos
   memoria y corra más rápido, a cambio de algo de precisión.
-- **La cuenta de memoria.** Un modelo de 8B parámetros en FP16 pesa ~16 GB (no entra en una GPU de
-  consumo de 8-12 GB). En INT4 pesa ~4-5 GB — entra. Esa es la razón por la que podés correr Llama
-  3.1 8B en tu laptop.
+- **La cuenta de memoria.** Un modelo de 8B parámetros (Qwen3 8B, Llama 3.1 8B legacy) en FP16 pesa
+  ~16 GB (no entra en una GPU de consumo de 8-12 GB); en INT4, ~4-5 GB — ahí sí entra. Si en cambio
+  vas por algo más liviano tipo 3-4B (Llama 3.2 3B, Gemma 3 4B) para una laptop sin GPU dedicada, la
+  misma cuenta escala hacia abajo: ~6-8 GB en FP16 contra ~2 GB en INT4.
 - **El trade-off.** Menos bits → más chico y más rápido, pero **más pérdida de calidad**. La sorpresa
   útil: la degradación de FP16 → INT8 suele ser **casi imperceptible**, y FP16 → INT4 es notable pero
   a menudo aceptable. INT4 es el punto dulce de "corre en mi máquina y responde bien".

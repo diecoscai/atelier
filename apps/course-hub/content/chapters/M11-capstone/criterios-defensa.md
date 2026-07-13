@@ -23,6 +23,9 @@ posicionar y defender** el portfolio entero.
   medible* (número antes→después), no descripciones.
 - **(can-defend)** El audit de keywords ATS: por qué cada keyword del CV está respaldada en al
   menos *can-explain*, y por qué reclamar una que no podés defender es peor que no tenerla.
+- **(awareness)** Si tu señal #7 es un MCP server, que esté verificado contra la especificación MCP
+  vigente (`2026-07-28`) y no roto por los cambios breaking (protocolo stateless sin sticky
+  sessions, "Tasks" degradado a extensión) — un repo desactualizado resta señal en vez de sumarla.
 
 ## Distribución
 

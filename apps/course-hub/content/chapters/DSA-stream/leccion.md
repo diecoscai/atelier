@@ -87,19 +87,34 @@ conocimiento desconectado — es la misma forma de pensar costo.
 
 ---
 
-## 4. Modo AI-assisted coding round (nuevo en 2026)
+## 4. Modo AI-assisted coding round (de rareza a norma)
 
-Desde 2025-2026, algunas empresas permiten — o esperan — el uso de herramientas de AI en la
-ronda de coding:
+Lo que arrancó como una movida puntual de Canva en 2025 ya es, a mediados de 2026, un patrón de
+industria con varias empresas grandes sumadas. Esto es lo confirmado a julio de 2026:
 
-- **Canva (jun-2025):** espera explícitamente que los candidatos usen Copilot/Cursor/Claude Code
-  en la ronda técnica.
-- **Google (piloto Q2-2026):** está probando una ronda donde Gemini está disponible como
-  herramienta durante el coding round.
+- **Canva (jun-2025, vigente):** en su blog de ingeniería ("Yes, You Can Use AI in Our Interviews.
+  In fact, we insist", canva.dev) anunciaron que **esperan** que los candidatos a Backend, Machine
+  Learning y Frontend usen herramientas como Copilot, Cursor o Claude durante la entrevista
+  técnica. Reemplazaron el viejo screening de "CS Fundamentals" por una competencia explícita de
+  "AI-Assisted Coding". Sigue activo un año después.
+- **Meta (rollout oct-2025, en expansión durante 2026):** para roles E4/E5 de SWE corre en
+  CoderPad con acceso a GPT-5, Claude Sonnet 4/4.5, Gemini 2.5 Pro y Llama 4 Maverick. Se está
+  extendiendo a más roles de backend/ops a lo largo de 2026.
+- **Google (rollout en curso, horizonte de 12-18 meses):** formalizó una ronda de "code
+  comprehension" de 60 minutos en un CoderPad de 3 paneles (explorador de archivos, editor, y un
+  chat con Gemini que **no** edita archivos directamente). El candidato recorre fases de
+  bug-fixing → implementación → optimización sobre un codebase multi-archivo. Por ahora apunta a
+  roles junior/mid en equipos seleccionados de EE.UU., con transición completa planeada para
+  2026-2027 — no es un piloto acotado que ya cerró, sigue rodando.
+- **Shopify, Rippling, LinkedIn, Coinbase:** permiten o piden que el candidato traiga su propio
+  IDE/herramienta de AI; Coinbase trata la fluidez con AI como una señal a favor, no una falta.
 
-Esto **no reemplaza** el modo clásico (solo vos + el enunciado). En la mayoría de loops sigue
-existiendo la ronda tradicional, y el modo AI-assisted evalúa habilidades distintas. Necesitás
-prepararte para los dos.
+El punto en común: el criterio ya no es "¿usaste IA, sí o no?" sino **qué tan bien la usaste** —
+prompt engineering, validación del output, debugging del código generado. Varias de estas empresas
+lo evalúan como competencia explícita, no como tolerancia.
+
+Esto **no reemplaza** el modo clásico (solo vos + el enunciado). Sigue siendo mayoría de loops, y
+el modo AI-assisted evalúa habilidades distintas. Necesitás prepararte para los dos.
 
 ### Qué evalúan en el modo AI-assisted
 
@@ -124,9 +139,18 @@ abierto, pero seguí el guion de 5 pasos (§1) y usá el agente solo en pasos ac
 de resolverlo, **defendé cada decisión**: ¿por qué delegaste ese paso al agente? ¿Cómo
 verificaste que el output era correcto? ¿Qué hubieras hecho diferente sin el agente?
 
-Este modo de práctica es también el training del patrón Karpathy: *"Vibe coding raises the floor.
-Agentic engineering is about extrapolating the ceiling."* — el nivel sube cuando usás el agente
-con criterio, no cuando le cedés el control.
+Dado que ahora varias empresas evalúan explícitamente la "fluidez con AI" como competencia propia
+(no solo si llegaste a la solución), practicar *solo* resolución manual deja un hueco: sumá
+prompting + validación de código generado como habilidad de entrevista en sí misma, no como
+atajo.
+
+Este modo de práctica entrena el framework que Karpathy viene desarrollando en charlas y
+entrevistas desde fines de 2025 (no es la cita textual del tweet donde acuñó "vibe coding" en
+feb-2025 — esa solo nombraba el concepto): *vibe coding* baja el piso, porque cualquiera puede
+producir algo funcional sin saber programar; *agentic engineering* es lo que sube el techo,
+porque mantiene el nivel profesional cuando delegás partes del trabajo a un agente. Practicar en
+modo AI-assisted es entrenar exactamente esa segunda habilidad — usar el agente con criterio, no
+cederle el control.
 
 ---
 

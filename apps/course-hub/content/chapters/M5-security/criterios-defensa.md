@@ -23,9 +23,13 @@ listón en los temas core (injection, ACL, red-team) es *can-defend-in-system-de
 - **(can-defend-in-system-design)** "¿Tu MCP server (M3) es un vector de ataque? ¿Cómo lo
   limitaste?" — scope de tools del server, capacidades externas que el agente no tiene, qué parte
   de la trifecta controlaste. Conectar M3↔M5 en la defensa.
-- **(awareness)** Ataques reales de 2025: Supabase MCP leak (Willison, 6-jul-2025) y "Summer of
-  Johann" (Willison, 15-ago-2025) — ataques masivos a integraciones MCP y GitHub. El patrón: la
-  trifecta explotada en producción.
+- **(awareness)** Ataques reales 2025-2026: Supabase MCP leak (Willison, 6-jul-2025), "Summer of
+  Johann" (Willison, 15-ago-2025), el backdoor de supply-chain en LiteLLM (mar-2026) y postmark-mcp
+  — primer servidor MCP malicioso documentado en el wild. El patrón: la trifecta (y su cadena de
+  supply-chain) explotada en producción.
+- **(awareness)** La tendencia 2026 de mitigación: cortar una pata del trifecta de forma
+  determinística sin depender de que el LLM evalúe el riesgo (ej. OpenAI Lockdown Mode restringe
+  outbound requests a nivel de infraestructura), en vez de agregar más guardrails probabilísticos.
 
 ## Modelo de amenazas (OWASP LLM Top 10)
 
@@ -35,6 +39,10 @@ listón en los temas core (injection, ACL, red-team) es *can-defend-in-system-de
   Vector & Embedding Weaknesses**, **LLM09 Misinformation**. En entrevista: ID + nombre siempre.
 - **(can-explain)** Por qué **LLM01 es el #1** y no se cierra con un prompt mejor: el LLM no separa
   instrucción de dato a nivel arquitectónico — todo es la misma secuencia de tokens.
+- **(awareness)** Que el **OWASP Top 10 for Agentic Applications 2026** (`ASI01`-`ASI10`, dic-2025)
+  es un framework **hermano** del LLM Top 10, no una renumeración — riesgos de comportamiento
+  agéntico (tool misuse, supply-chain, memory poisoning), no del modelo/app. No confundir los dos
+  esquemas de IDs en entrevista.
 
 ## Prompt injection (directa e indirecta)
 

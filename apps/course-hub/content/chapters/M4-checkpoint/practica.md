@@ -18,7 +18,8 @@ y evaluable en 5 minutos. Cada paso tiene **Hacer** y **Verificar**. No avances 
 - M3 cerrado: `/chat` recupera con hybrid+rerank y tenés `recall@5` medido contra el golden set.
 - Leíste los ★ Core de `material-apoyo.md`; podés explicar por qué el system prompt no aísla
   tenants y qué miden (y qué no) los logprobs, *sin mirar*.
-- `uv add instructor pyjwt` en `services/api`.
+- `uv add "instructor==1.15.4" "pyjwt>=2.13"` en `services/api` — pineá versión, no instales a
+  ciegas (ver `material-apoyo.md`: PyJWT 2.13 endureció defaults de seguridad relevantes acá).
 
 ---
 
@@ -27,7 +28,8 @@ y evaluable en 5 minutos. Cada paso tiene **Hacer** y **Verificar**. No avances 
 - Definí los modelos Pydantic `Citation` (`chunk_id: int`, `quote: str`) y `Answer`
   (`text: str`, `citations: list[Citation]`, `answered: bool`). Usá `Field(description=...)` en
   cada campo para guiar al modelo (ver lección §2).
-- Parcheá el cliente: `client = instructor.from_openai(OpenAI())`.
+- Armá el cliente con el patrón unificado actual: `client = instructor.from_provider("openai/gpt-4o-2024-08-06")`
+  (versioná el snapshot del modelo explícito, no el alias desnudo `gpt-4o`).
 - Refactorizá `/chat`: en vez de devolver texto, numerá los chunks recuperados en el prompt
   (`[chunk 12] ...`) y pedí `response_model=Answer`, `max_retries=2`.
 
@@ -55,7 +57,8 @@ confirmá que `verify_citation` la rechaza. (Test en `pruebas.md`, capa 1.)
   citations=[])`. **Calibrá el umbral contra el golden dataset de M2**: corré queries con respuesta
   y queries sin respuesta, y elegí el umbral que abstiene en las segundas sin abstenerse en las
   primeras. Anotá el número y el método en `DECISIONS.md` (no lo inventes).
-- **Confidence vía logprobs:** pedí `logprobs=True, top_logprobs=5` en la llamada de generación.
+- **Confidence vía logprobs:** pedí `logprobs=True, top_logprobs=5` en la llamada de generación
+  (recordá: esto es Chat Completions, no Responses API — lección §5).
   Implementá `confidence(tokens)` que agregue `exp(logprob)` (media, y también `min` para el cuello
   de botella — lección §5). Adjuntá el score a la respuesta (campo extra o metadata).
 - Mostrá el badge de confianza en el frontend; con confianza baja, marcá la respuesta o sugerí
@@ -78,7 +81,9 @@ de abstención está justificado con números del golden set en `DECISIONS.md`.
   quede sin ese filtro.
 - **(Opcional, defensa en profundidad):** activá Postgres RLS en `chunks` con una policy
   `USING (tenant_id = current_setting('app.current_tenant'))` y seteá la variable por request tras
-  verificar el JWT. Loguealo como ADR.
+  verificar el JWT con **`SET LOCAL app.current_tenant = ...`** (nunca `SET` a secas — con
+  connection pooling en producción, `SET` sin `LOCAL` deja el valor pegado a la conexión y puede
+  filtrarse al siguiente tenant que la reuse). Loguealo como ADR.
 
 **Verificar:** escribí el **test de aislamiento cross-tenant** (`pruebas.md`, capa 1, EL test):
 ingestás un doc para `acme` y otro para `globex`, hacés una query desde `acme` que semánticamente
@@ -88,9 +93,13 @@ matchearía el doc de `globex`, y asertás que el resultado contiene lo de `acme
 ## Paso 5 — Deploy público con TLS
 **Hacer:**
 - Deployá `services/api` (Railway o Fly) y `apps/web` (Vercel), conectando las URLs. Configurá las
-  env vars: OpenAI key, el secret del JWT, la connection string de Postgres+pgvector.
+  env vars: OpenAI key, el secret del JWT, la connection string de Postgres+pgvector. Ojo con el
+  presupuesto: **Fly.io** cobra desde el primer dólar tras su trial (pay-as-you-go, sin plan
+  gratis de respaldo); **Railway** cae a un Free plan de ~$1/mes de crédito tras el trial (existe,
+  pero no alcanza para 24/7) antes de necesitar Hobby ~$5/mes. El **TLS** sí es gratis en los dos,
+  el hosting real no.
 - Confirmá **TLS**: la URL pública es `https://` con candado válido (Railway/Fly lo dan automático
-  en su dominio).
+  vía Let's Encrypt en su dominio).
 - Smoke del flujo completo en la URL pública: con un JWT válido de `acme`, subir → preguntar →
   respuesta con cita verificada + badge de confianza; preguntar algo no cubierto → "no sé".
 
@@ -112,7 +121,8 @@ sobre `https://`. El smoke test del deploy responde 200.
   confidence). Que se lea en 30 segundos. Embebido en el README.
 - **README con métricas:** `recall@5` hybrid+rerank vs baseline (de M3), **aislamiento cross-tenant
   verificado** (link al test), stack, cómo correrlo, link al deploy y al eval dashboard (M2).
-  Números, no adjetivos.
+  Números, no adjetivos. Si te alcanza el tiempo, corré un bootstrap pareado sobre el golden set
+  para saber si la mejora de recall@5 es significativa y no ruido (lección §7).
 - **Demo (Loom 2-3 min):** subir → preguntar (cita verificada + badge) → preguntar algo no cubierto
   (→ "no sé") → mostrar el test de aislamiento en verde.
 - Escribí tus respuestas a los **defense drills** y hacé el **mock defense** (`pruebas.md` capa 2 +

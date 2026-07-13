@@ -12,8 +12,12 @@ gate: pending
       Un test que curlea la URL de prod y asierta status + que la respuesta cita un chunk.
 - [ ] **IaC idempotente:** `terraform plan` sobre la infra desplegada devuelve "No changes" — el
       código describe el estado real (no hay drift).
-- [ ] **Secret fuera del repo:** `git grep -iE "sk-[A-Za-z0-9]"` (y el contenido de la imagen) no
-      contiene la API key. El servicio en prod responde usando la key inyectada desde Secret Manager.
+- [ ] **Secret fuera del repo:** `git grep -iE "sk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}"` (y
+      el contenido de la imagen) no contiene la API key. El patrón cubre los prefijos vigentes de
+      OpenAI (`sk-proj-` para project keys desde 2024, `sk-svcacct-`, `sk-admin-`) y también las
+      keys legacy sin prefijo — ojo si copiás el patrón, el guión va DENTRO del grupo opcional
+      (`proj-`, no `proj` + guión suelto), si no las legacy no matchean. El servicio en prod
+      responde usando la key inyectada desde Secret Manager.
 - [ ] **Benchmark de vLLM corre y reporta throughput:** `vllm bench serve` completa y emite una
       tabla con throughput (req/s y tok/s), TTFT y TPOT, para `request-rate=1` y `request-rate=10`.
       El número agregado de tok/s a rate=10 es mayor que a rate=1 (evidencia de continuous batching).

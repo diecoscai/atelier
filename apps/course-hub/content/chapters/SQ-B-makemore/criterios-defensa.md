@@ -16,3 +16,7 @@ Al terminar la side-quest tenés que poder, en el nivel honesto indicado:
   gradient descent.
 - **(can-defend)** Qué es un logprob, cómo lo instrumentaste en Grounded, y cómo lo usarías como
   señal de confianza para decidir abstención — conectándolo con M4.
+- **(can-explain)** Qué modelo llama el endpoint `/chat` de Grounded, si es un modelo de
+  razonamiento (`o1`/`o3`, `gpt-5*`/`gpt-5.6*`) o no, y si esa llamada usa Chat Completions o
+  Responses API — y por qué esas dos distinciones (modelo y API) determinan si `logprobs` y
+  `temperature` funcionan como se espera.

@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: nada (script autocontenido; los prompts son fork del script de la actualización masiva de julio 2026).
-- Produces: workflow invocable como `Workflow({name: 'refresh-seccion', args: '<slug> <YYYY-MM-DD>'})`. Retorna `{slug, score, rounds, summary}` en éxito, `{error}` en args inválidos, `{slug, score, rounds, needsAttention: true, issues}` si no llega a 8 en 3 rondas.
+- Produces: workflow invocable como `Workflow({scriptPath: '.claude/workflows/refresh-seccion.js', args: '<slug> <YYYY-MM-DD>'})` (la resolución por `name` solo cubre `~/.claude/workflows`, no el repo — verificado). Retorna `{slug, score, rounds, summary}` en éxito, `{error}` en args inválidos, `{slug, score, rounds, needsAttention: true, issues}` si no llega a 8 en 3 rondas.
 
 - [ ] **Step 1: Escribir el script completo**
 
